@@ -3,13 +3,13 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
-    <RootNamespace>FlyleafPlayer__Custom___MVVM_</RootNamespace>
+    <RootNamespace>FlyeleafPlayer__D3DImage_</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
-    <Platforms>AnyCPU;x86;x64</Platforms>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FlyleafLib\FlyleafLib.csproj" />
+    <ProjectReference Include="..\FlyleafLib\FlyleafLib.csproj" />
   </ItemGroup>
 
 </Project>

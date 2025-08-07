@@ -154,8 +154,7 @@
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>del /S /F /Q "$(TargetDir)Plugins"
-if not exist "$(TargetDir)Plugins" mkdir "$(TargetDir)Plugins"
-xcopy "$(SolutionDir)\Plugins\bin\Plugins.NET4\*" "$(TargetDir)Plugins\" /E /Y</PostBuildEvent>
+    <PostBuildEvent>
+    </PostBuildEvent>
   </PropertyGroup>
 </Project>

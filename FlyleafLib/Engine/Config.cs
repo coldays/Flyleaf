@@ -27,18 +27,18 @@ public class Config : NotifyPropertyChanged
     public Config()
     {
         // Parse default plugin options to Config.Plugins (Creates instances until fix with statics in interfaces)
-        foreach (var plugin in Engine.Plugins.Types.Values)
-        {
-            var tmpPlugin = PluginHandler.CreatePluginInstance(plugin);
-            var defaultOptions = tmpPlugin.GetDefaultOptions();
-            tmpPlugin.Dispose();
+        //foreach (var plugin in Engine.Plugins.Types.Values)
+        //{
+        //    var tmpPlugin = PluginHandler.CreatePluginInstance(plugin);
+        //    var defaultOptions = tmpPlugin.GetDefaultOptions();
+        //    tmpPlugin.Dispose();
 
-            if (defaultOptions == null || defaultOptions.Count == 0) continue;
+        //    if (defaultOptions == null || defaultOptions.Count == 0) continue;
 
-            Plugins.Add(plugin.Name, new SerializableDictionary<string, string>());
-            foreach (var opt in defaultOptions)
-                Plugins[plugin.Name].Add(opt.Key, opt.Value);
-        }
+        //    Plugins.Add(plugin.Name, new SerializableDictionary<string, string>());
+        //    foreach (var opt in defaultOptions)
+        //        Plugins[plugin.Name].Add(opt.Key, opt.Value);
+        //}
 
         Player.config = this;
         Demuxer.config = this;

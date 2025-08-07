@@ -156,9 +156,9 @@ public static class Engine
 
         FFmpeg  = new FFmpegEngine();
         Video   = new VideoEngine();
-        if (Config.FFmpegDevices)
-            VideoDevice.RefreshDevices();
         Plugins = new PluginsEngine();
+        //if (Config.FFmpegDevices)
+        //    VideoDevice.RefreshDevices();
         Players = new List<Player>();
 
         IsLoaded = true;

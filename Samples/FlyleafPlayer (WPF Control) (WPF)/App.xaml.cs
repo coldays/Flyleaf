@@ -35,7 +35,7 @@ namespace FlyleafPlayer
             engineConfig = DefaultEngineConfig();
             #endif
 
-            Engine.StartAsync(engineConfig);
+            Engine.Start(engineConfig);
         }
 
         private EngineConfig DefaultEngineConfig()
