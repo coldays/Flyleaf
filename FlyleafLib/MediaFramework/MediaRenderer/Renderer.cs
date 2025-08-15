@@ -1,16 +1,15 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Runtime.InteropServices;
-using System.Windows;
-
-using Vortice;
-using Vortice.DXGI;
-using Vortice.Direct3D11;
-using Vortice.Mathematics;
-
-using FlyleafLib.MediaFramework.MediaDecoder;
+﻿using FlyleafLib.MediaFramework.MediaDecoder;
 using FlyleafLib.MediaFramework.MediaFrame;
 using FlyleafLib.MediaFramework.MediaStream;
+using System;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Windows;
+using Vortice;
+using Vortice.Direct3D11;
+using Vortice.DXGI;
+using Vortice.Mathematics;
 
 namespace FlyleafLib.MediaFramework.MediaRenderer;
 
@@ -97,6 +96,20 @@ public partial class Renderer : NotifyPropertyChanged, IDisposable
         }
     }
 
+    public void SetPanXY(int panX, int panY, bool refresh = true)
+    {
+        lock (lockDevice)
+        {
+            panXOffset = panX;
+            panYOffset = panY;
+
+            if (Disposed)
+                return;
+
+            SetViewport(refresh);
+        }
+    }
+
     public uint             Rotation        { get => _RotationAngle;set { lock (lockDevice) UpdateRotation(value); } }
     uint _RotationAngle;
     VideoProcessorRotation _d3d11vpRotation  = VideoProcessorRotation.Identity;
@@ -120,6 +133,12 @@ public partial class Renderer : NotifyPropertyChanged, IDisposable
     {
         lock(lockDevice)
         {
+            if (zoom < 1)
+            {
+                ResetPanAndZoom();
+                return;
+            }
+
             this.zoom = zoom;
 
             if (Disposed)
@@ -149,6 +168,12 @@ public partial class Renderer : NotifyPropertyChanged, IDisposable
     {
         lock(lockDevice)
         {
+            if (zoom < 1)
+            {
+                ResetPanAndZoom();
+                return;
+            }
+
             this.zoom = zoom;
             zoomCenter = p;
 
@@ -163,6 +188,9 @@ public partial class Renderer : NotifyPropertyChanged, IDisposable
     {
         lock(lockDevice)
         {
+            if (zoom < 1)
+                return;
+
             panXOffset = panX;
             panYOffset = panY;
             this.zoom = zoom;
@@ -175,6 +203,14 @@ public partial class Renderer : NotifyPropertyChanged, IDisposable
             if (refresh)
                 SetViewport();
         }
+    }
+
+    private void ResetPanAndZoom()
+    {
+        panXOffset = panYOffset = 0;
+        zoom = 1;
+        zoomCenter = ZoomCenterPoint;
+        SetViewport();
     }
 
     public int              UniqueId        { get; private set; }
