@@ -47,7 +47,6 @@
   </ItemGroup>
 
   <ItemGroup>
-	<!--<PackageReference Include="Flyleaf.FFmpeg.Bindings" Version="7.1.1" />-->
 	<PackageReference Include="FFmpeg.AutoGen" Version="7.1.1" />
 	<PackageReference Include="Vortice.D3DCompiler" Version="2.4.2" />
 	<PackageReference Include="Vortice.Direct3D11" Version="2.4.2" />
