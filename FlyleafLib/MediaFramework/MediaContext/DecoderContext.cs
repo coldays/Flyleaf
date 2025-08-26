@@ -8,6 +8,8 @@ using FlyleafLib.Plugins;
 using static FlyleafLib.Logger;
 using static FlyleafLib.Utils;
 
+using static FFmpeg.AutoGen.ffmpeg;
+
 namespace FlyleafLib.MediaFramework.MediaContext;
 
 public unsafe partial class DecoderContext : PluginHandler
@@ -530,9 +532,9 @@ public unsafe partial class DecoderContext : PluginHandler
 
             var codecType = VideoDemuxer.FormatContext->streams[packet->stream_index]->codecpar->codec_type;
 
-            if (codecType == AVMediaType.Video && VideoDecoder.keyPacketRequired)
+            if (codecType == AVMediaType.AVMEDIA_TYPE_VIDEO && VideoDecoder.keyPacketRequired)
             {
-                if (packet->flags.HasFlag(PktFlags.Key))
+                if ((packet->flags & AV_PKT_FLAG_KEY) != 0)
                     VideoDecoder.keyPacketRequired = false;
                 else
                 {
@@ -547,7 +549,7 @@ public unsafe partial class DecoderContext : PluginHandler
 
             switch (codecType)
             {
-                case AVMediaType.Audio:
+                case AVMediaType.AVMEDIA_TYPE_AUDIO:
                     if (timestamp == -1 || (long)(packet->pts * AudioStream.Timebase) - VideoDemuxer.StartTime + (VideoStream.FrameDuration / 2) > timestamp)
                         VideoDemuxer.AudioPackets.Enqueue(packet);
                     else
@@ -555,7 +557,7 @@ public unsafe partial class DecoderContext : PluginHandler
 
                     continue;
 
-                case AVMediaType.Subtitle:
+                case AVMediaType.AVMEDIA_TYPE_SUBTITLE:
                     if (timestamp == -1 || (long)(packet->pts * SubtitlesStream.Timebase) - VideoDemuxer.StartTime + (VideoStream.FrameDuration / 2) > timestamp)
                         VideoDemuxer.SubtitlesPackets.Enqueue(packet);
                     else
@@ -563,15 +565,15 @@ public unsafe partial class DecoderContext : PluginHandler
 
                     continue;
 
-                case AVMediaType.Data: // this should catch the data stream packets until we have a valid vidoe keyframe (it should fill the pts if NOPTS with lastVideoPacketPts similarly to the demuxer)
-                    if ((timestamp == -1 && VideoDecoder.StartTime != NoTs) || (long)(packet->pts * DataStream.Timebase) - VideoDemuxer.StartTime + (VideoStream.FrameDuration / 2) > timestamp)
+                case AVMediaType.AVMEDIA_TYPE_DATA: // this should catch the data stream packets until we have a valid vidoe keyframe (it should fill the pts if NOPTS with lastVideoPacketPts similarly to the demuxer)
+                    if ((timestamp == -1 && VideoDecoder.StartTime != AV_NOPTS_VALUE) || (long)(packet->pts * DataStream.Timebase) - VideoDemuxer.StartTime + (VideoStream.FrameDuration / 2) > timestamp)
                         VideoDemuxer.DataPackets.Enqueue(packet);
 
                     packet = av_packet_alloc();
 
                     continue;
 
-                case AVMediaType.Video:
+                case AVMediaType.AVMEDIA_TYPE_VIDEO:
                     ret = avcodec_send_packet(VideoDecoder.CodecCtx, packet);
 
                     if (VideoDecoder.swFallback)

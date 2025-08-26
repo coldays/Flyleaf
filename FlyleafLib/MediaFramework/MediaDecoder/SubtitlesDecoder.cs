@@ -8,6 +8,9 @@ using static FlyleafLib.Logger;
 
 namespace FlyleafLib.MediaFramework.MediaDecoder;
 
+using FFmpeg.AutoGen;
+using static FFmpeg.AutoGen.ffmpeg;
+
 public unsafe class SubtitlesDecoder : DecoderBase
 {
     public SubtitlesStream  SubtitlesStream     => (SubtitlesStream) Stream;
@@ -175,7 +178,7 @@ public unsafe class SubtitlesDecoder : DecoderBase
                 subFrame.duration   = subFrame.sub.end_display_time;
                 subFrame.timestamp  = pts - demuxer.StartTime + Config.Subtitles.Delay;
 
-                if (subFrame.sub.rects[0]->type == AVSubtitleType.Ass)
+                if (subFrame.sub.rects[0]->type == AVSubtitleType.SUBTITLE_ASS)
                 {
                     subFrame.text = Utils.BytePtrToStringUTF8(subFrame.sub.rects[0]->ass);
                     Config.Subtitles.Parser(subFrame);
@@ -186,7 +189,7 @@ public unsafe class SubtitlesDecoder : DecoderBase
                     if (string.IsNullOrEmpty(subFrame.text))
                         continue;
                 }
-                else if (subFrame.sub.rects[0]->type == AVSubtitleType.Text)
+                else if (subFrame.sub.rects[0]->type == AVSubtitleType.SUBTITLE_TEXT)
                 {
                     subFrame.text = Utils.BytePtrToStringUTF8(subFrame.sub.rects[0]->text);
 

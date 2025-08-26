@@ -7,6 +7,8 @@ using FlyleafLib.MediaFramework.MediaFrame;
 using static FlyleafLib.Utils;
 using static FlyleafLib.Logger;
 
+using static FFmpeg.AutoGen.ffmpeg;
+
 namespace FlyleafLib.MediaPlayer;
 
 unsafe partial class Player
@@ -675,7 +677,11 @@ unsafe partial class Player
         else if (curLatency < Config.Player.MaxLatency)
             return;
 
+#if NET5_0_OR_GREATER
         var newSpeed = Math.Max(Math.Round((double)curLatency / Config.Player.MaxLatency, 1, MidpointRounding.ToPositiveInfinity), 1.1);
+#else
+        var newSpeed = Math.Max(Math.Round((double)curLatency / (curLatency - Config.Player.MinLatency), 1), 1.1);
+#endif
 
         if (newSpeed > 4) // TBR: dispose only as much as required to avoid rebuffering
         {
@@ -715,7 +721,7 @@ unsafe partial class Player
     private long GetBufferedDuration()
     {
         var decoder = VideoDecoder.Frames.IsEmpty ? 0 : VideoDecoder.Frames.ToArray()[^1].timestamp - vFrame.timestamp;
-        var demuxer = VideoDemuxer.VideoPackets.IsEmpty || VideoDemuxer.VideoPackets.LastTimestamp == NoTs
+        var demuxer = VideoDemuxer.VideoPackets.IsEmpty || VideoDemuxer.VideoPackets.LastTimestamp == AV_NOPTS_VALUE
             ? 0 :
             (VideoDemuxer.VideoPackets.LastTimestamp - VideoDemuxer.StartTime) - vFrame.timestamp;
 

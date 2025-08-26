@@ -871,12 +871,12 @@ unsafe partial class Player
             if (url_iostream is string url_iostream_str)
             {
                 // convert Windows lnk file to targetPath
-                if (Path.GetExtension(url_iostream_str).Equals(".lnk", StringComparison.OrdinalIgnoreCase))
-                {
-                    var targetPath = GetLnkTargetPath(url_iostream_str);
-                    if (targetPath != null)
-                        url_iostream = targetPath;
-                }
+                //if (Path.GetExtension(url_iostream_str).Equals(".lnk", StringComparison.OrdinalIgnoreCase))
+                //{
+                //    var targetPath = GetLnkTargetPath(url_iostream_str);
+                //    if (targetPath != null)
+                //        url_iostream = targetPath;
+                //}
             }
 
             if ((url_iostream is string) && ExtensionsSubtitles.Contains(GetUrlExtention(url_iostream.ToString())))

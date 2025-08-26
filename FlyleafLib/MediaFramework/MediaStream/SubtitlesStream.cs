@@ -2,6 +2,8 @@
 
 using FlyleafLib.MediaFramework.MediaDemuxer;
 
+using static FFmpeg.AutoGen.ffmpeg;
+
 namespace FlyleafLib.MediaFramework.MediaStream;
 
 public unsafe class SubtitlesStream : StreamBase
@@ -19,7 +21,7 @@ public unsafe class SubtitlesStream : StreamBase
         base.Refresh();
 
         var codecDescr  = avcodec_descriptor_get(CodecID);
-        IsBitmap        = codecDescr != null && (codecDescr->props & CodecPropFlags.BitmapSub) != 0;
+        IsBitmap        = codecDescr != null && (codecDescr->props & AV_CODEC_PROP_BITMAP_SUB) != 0;
 
         if (Demuxer.FormatContext->nb_streams == 1) // External Streams (mainly for .sub will have as start time the first subs timestamp)
             StartTime = 0;
@@ -28,7 +30,7 @@ public unsafe class SubtitlesStream : StreamBase
     public void ExternalStreamAdded()
     {
         // VobSub (parse .idx data to extradata - based on .sub url)
-        if (CodecID == AVCodecID.DvdSubtitle && ExternalStream != null && ExternalStream.Url.EndsWith(".sub", StringComparison.OrdinalIgnoreCase))
+        if (CodecID == AVCodecID.AV_CODEC_ID_DVD_SUBTITLE && ExternalStream != null && ExternalStream.Url.EndsWith(".sub", StringComparison.OrdinalIgnoreCase))
         {
             var idxFile = ExternalStream.Url.Substring(0, ExternalStream.Url.Length - 3) + "idx";
             if (File.Exists(idxFile))

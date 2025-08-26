@@ -4,6 +4,8 @@ using System.Reflection;
 
 using Vortice.MediaFoundation;
 
+using static FFmpeg.AutoGen.ffmpeg;
+
 namespace FlyleafLib.MediaFramework.MediaDevice;
 
 public class VideoDeviceStream : DeviceStreamBase
@@ -45,12 +47,12 @@ public class VideoDeviceStream : DeviceStreamBase
         switch (subType)
         {
             case "MJPG":
-                var descriptorPtr = avcodec_descriptor_get(AVCodecID.Mjpeg);
+                var descriptorPtr = avcodec_descriptor_get(AVCodecID.AV_CODEC_ID_MJPEG);
                 return $"vcodec={Utils.BytePtrToStringUTF8(descriptorPtr->name)}";
             case "YUY2":
-                return $"pixel_format={av_get_pix_fmt_name(AVPixelFormat.Yuyv422)}";
+                return $"pixel_format={av_get_pix_fmt_name(AVPixelFormat.AV_PIX_FMT_YUYV422)}";
             case "NV12":
-                return $"pixel_format={av_get_pix_fmt_name(AVPixelFormat.Nv12)}";
+                return $"pixel_format={av_get_pix_fmt_name(AVPixelFormat.AV_PIX_FMT_NV12)}";
             default:
                 return "";
         }
@@ -139,7 +141,7 @@ public class VideoDeviceStream : DeviceStreamBase
 
         // MF_MT_SUBTYPE
         // Subtype GUID which describes the basic media type, we return this as human readable text
-        var subType = mediaType.GetGUID(MediaTypeAttributeKeys.Subtype);
+        var subType = mediaType.Get<Guid>(MediaTypeAttributeKeys.Subtype);
 
         // MF_MT_FRAME_SIZE
         // the Width and height of a video frame, in pixels

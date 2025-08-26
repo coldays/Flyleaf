@@ -49,8 +49,7 @@ public class PlaylistItem : DemuxerInput
                     Tag                     { get; set; } = [];
     public void AddTag(object tag, string pluginName)
     {
-        if (!Tag.TryAdd(pluginName, tag))
-            Tag[pluginName] = tag;
+        Tag[pluginName] = tag;
     }
 
     public object GetTag(string pluginName)

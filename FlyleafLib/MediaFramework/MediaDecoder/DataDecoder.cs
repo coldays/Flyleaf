@@ -4,6 +4,8 @@ using System.Runtime.InteropServices;
 
 using FlyleafLib.MediaFramework.MediaFrame;
 using FlyleafLib.MediaFramework.MediaStream;
+using FFmpeg.AutoGen;
+using static FFmpeg.AutoGen.ffmpeg;
 
 namespace FlyleafLib.MediaFramework.MediaDecoder;
 public unsafe class DataDecoder : DecoderBase

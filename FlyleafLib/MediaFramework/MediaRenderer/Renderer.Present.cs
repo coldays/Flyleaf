@@ -121,7 +121,7 @@ public unsafe partial class Renderer
         {
             if (frame.avFrame != null)
             {
-                vpivd.Texture2D.ArraySlice = (uint) frame.avFrame->data[1];
+                vpivd.Texture2D.ArraySlice = (int) frame.avFrame->data[1];
                 vd1.CreateVideoProcessorInputView(VideoDecoder.textureFFmpeg, vpe, vpivd, out vpiv);
             }
             else
@@ -134,7 +134,7 @@ public unsafe partial class Renderer
             {
                 vpsa[0].InputSurface = vpiv;
                 vc.VideoProcessorBlt(vp, vpov, 0, 1, vpsa);
-                swapChain.Present(Config.Video.VSync, forceWait ? PresentFlags.None : Config.Video.PresentFlags);
+                swapChain.Present((int)Config.Video.VSync, forceWait ? PresentFlags.None : Config.Video.PresentFlags);
 
                 vpiv.Dispose();
             }
@@ -167,7 +167,7 @@ public unsafe partial class Renderer
                 context.OMSetBlendState(curPSCase == PSCase.RGBPacked ? blendStateAlpha : null);
             }
 
-            swapChain.Present(Config.Video.VSync, forceWait ? PresentFlags.None : Config.Video.PresentFlags);
+            swapChain.Present((int)Config.Video.VSync, forceWait ? PresentFlags.None : Config.Video.PresentFlags);
         }
 
         child?.PresentInternal(frame);
@@ -194,8 +194,8 @@ public unsafe partial class Renderer
         overlayTextureOriginalHeight= streamHeight;
         overlayTextureOriginalPosX  = rect->x;
         overlayTextureOriginalPosY  = rect->y;
-        overlayTextureDesc.Width    = (uint)rect->w;
-        overlayTextureDesc.Height   = (uint)rect->h;
+        overlayTextureDesc.Width    = rect->w;
+        overlayTextureDesc.Height   = rect->h;
 
         byte[] data = new byte[rect->w * rect->h * 4];
 
@@ -219,7 +219,7 @@ public unsafe partial class Renderer
             }
 
             subDataOverlay.DataPointer = (nint)ptr;
-            subDataOverlay.RowPitch    = (uint)stride;
+            subDataOverlay.RowPitch    = stride;
 
             overlayTexture?.Dispose();
             overlayTextureSrv?.Dispose();
@@ -264,7 +264,7 @@ public unsafe partial class Renderer
                 else if (Config.Video.ClearScreen)
                 {
                     context.ClearRenderTargetView(backBufferRtv, Config.Video._BackgroundColor);
-                    swapChain.Present(Config.Video.VSync, PresentFlags.None);
+                    swapChain.Present((int)Config.Video.VSync, PresentFlags.None);
                 }
             }
             catch (Exception e)

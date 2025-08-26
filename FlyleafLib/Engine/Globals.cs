@@ -1,6 +1,5 @@
 ﻿global using System;
-global using Flyleaf.FFmpeg;
-global using static Flyleaf.FFmpeg.Raw;
+global using FFmpeg.AutoGen;
 
 using System.Collections.Generic;
 using System.ComponentModel;

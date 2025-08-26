@@ -15,6 +15,7 @@ using ID3D11Device = Vortice.Direct3D11.ID3D11Device;
 
 namespace FlyleafLib.MediaFramework.MediaRenderer;
 
+
 /* TODO
  * 1) Attach on every frame video output configuration so we will not have to worry for video codec change etc.
  *      this will fix also dynamic video stream change
@@ -40,7 +41,7 @@ public partial class Renderer : NotifyPropertyChanged, IDisposable
     public Config           Config          { get; private set;}
     public int              ControlWidth    { get; private set; }
     public int              ControlHeight   { get; private set; }
-    internal nint           ControlHandle;
+    internal IntPtr           ControlHandle;
 
     internal Action<IDXGISwapChain2>
                             SwapChainWinUIClbk;
@@ -59,8 +60,8 @@ public partial class Renderer : NotifyPropertyChanged, IDisposable
     public event EventHandler ViewportChanged;
 
     public CornerRadius     CornerRadius    { get => cornerRadius;              set { if (cornerRadius == value) return; cornerRadius = value; UpdateCornerRadius(); } }
-    CornerRadius cornerRadius = new(0);
-    CornerRadius zeroCornerRadius = new(0);
+    CornerRadius cornerRadius = new CornerRadius(0);
+    CornerRadius zeroCornerRadius = new CornerRadius(0);
 
     public int              SideXPixels     { get; private set; }
     public int              SideYPixels     { get; private set; }
@@ -133,7 +134,7 @@ public partial class Renderer : NotifyPropertyChanged, IDisposable
 
     public Point            ZoomCenter      { get => zoomCenter;                set => SetZoomCenter(value); }
     Point zoomCenter = ZoomCenterPoint;
-    internal static Point ZoomCenterPoint = new(0.5, 0.5);
+    internal static Point ZoomCenterPoint = new Point(0.5, 0.5);
     public void SetZoomCenter(Point p, bool refresh = true)
     {
         lock(lockDevice)
@@ -187,7 +188,7 @@ public partial class Renderer : NotifyPropertyChanged, IDisposable
     LogHandler Log;
     bool use2d;
 
-    public Renderer(VideoDecoder videoDecoder, nint handle = 0, int uniqueId = -1)
+    public Renderer(VideoDecoder videoDecoder, IntPtr handle, int uniqueId = -1)
     {
         UniqueId    = uniqueId == -1 ? Utils.GetUniqueId() : uniqueId;
         VideoDecoder= videoDecoder;
@@ -195,7 +196,7 @@ public partial class Renderer : NotifyPropertyChanged, IDisposable
         Log         = new LogHandler(("[#" + UniqueId + "]").PadRight(8, ' ') + " [Renderer      ] ");
         use2d       = Config.Video.Use2DGraphics;
 
-        overlayTextureDesc = new()
+        overlayTextureDesc = new Texture2DDescription()
         {
             Usage       = ResourceUsage.Default,
             Width       = 0,
@@ -231,7 +232,7 @@ public partial class Renderer : NotifyPropertyChanged, IDisposable
             SampleDescription   = new SampleDescription(1, 0)
         };
 
-        wndProcDelegate = new(WndProc);
+        wndProcDelegate = new Utils.NativeMethods.SubclassWndProc(WndProc);
         wndProcDelegatePtr = Marshal.GetFunctionPointerForDelegate(wndProcDelegate);
         ControlHandle = handle;
         Initialize();
@@ -240,7 +241,7 @@ public partial class Renderer : NotifyPropertyChanged, IDisposable
     #region Replica Renderer (Expiremental)
     public Renderer child; // allow access to child renderer (not safe)
     Renderer parent;
-    public Renderer(Renderer renderer, nint handle, int uniqueId = -1)
+    public Renderer(Renderer renderer, IntPtr handle, int uniqueId = -1)
     {
         UniqueId            = uniqueId == -1 ? Utils.GetUniqueId() : uniqueId;
         Log                 = new LogHandler(("[#" + UniqueId + "]").PadRight(8, ' ') + " [Renderer  Repl] ");
@@ -248,22 +249,22 @@ public partial class Renderer : NotifyPropertyChanged, IDisposable
         renderer.child      = this;
         parent              = renderer;
         Config              = renderer.Config;
-        wndProcDelegate     = new(WndProc);
+        wndProcDelegate     = new Utils.NativeMethods.SubclassWndProc(WndProc);
         wndProcDelegatePtr  = Marshal.GetFunctionPointerForDelegate(wndProcDelegate);
         ControlHandle       = handle;
     }
 
-    public void SetChildHandle(nint handle)
+    public void SetChildHandle(IntPtr handle)
     {
         lock (lockDevice)
         {
             if (child != null)
                 DisposeChild();
 
-            if (handle == 0)
+            if (handle == IntPtr.Zero)
                 return;
 
-            child = new(this, handle, UniqueId);
+            child = new Renderer(this, handle, UniqueId);
             InitializeChildSwapChain();
         }
     }

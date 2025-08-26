@@ -1,6 +1,9 @@
 ﻿using System.Collections.Generic;
 using System.Globalization;
+#if NET5_0_OR_GREATER
 using System.Text.Json.Serialization;
+#endif
+using System.Xml.Serialization;
 
 namespace FlyleafLib;
 
@@ -14,19 +17,34 @@ public class Language : IEquatable<Language>
     }
     string _CultureName;
 
+    [XmlIgnore]
+#if NET5_0_OR_GREATER
     [JsonIgnore]
+#endif
     public string       TopEnglishName    { get; private set; }
 
+    [XmlIgnore]
+#if NET5_0_OR_GREATER
     [JsonIgnore]
+#endif
     public CultureInfo  Culture         { get; private set; }
 
+    [XmlIgnore]
+#if NET5_0_OR_GREATER
     [JsonIgnore]
+#endif
     public CultureInfo  TopCulture      { get; private set; }
 
+    [XmlIgnore]
+#if NET5_0_OR_GREATER
     [JsonIgnore]
+#endif
     public string       IdSubLanguage   { get; private set; } // Can search for online subtitles with this id
 
+    [XmlIgnore]
+#if NET5_0_OR_GREATER
     [JsonIgnore]
+#endif
     public string       OriginalInput   { get; private set; } // Only for Undetermined language (return clone)
 
 

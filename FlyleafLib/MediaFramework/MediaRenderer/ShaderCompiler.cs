@@ -62,7 +62,19 @@ internal static partial class ShaderCompiler
         Span<byte> buffer   = bufferPool;
         PS_HEADER.CopyTo(buffer);
         int offset          = PS_HEADER.Length;
-        offset             += Encoding.UTF8.GetBytes(hlslSample, buffer[offset..]);
+
+        int bytesWritten;
+
+#if NETFRAMEWORK
+        char[] charArray = hlslSample.ToArray();
+        bytesWritten = Encoding.UTF8.GetBytes(charArray, 0, charArray.Length, bufferPool, offset);
+        #else
+            // Use Span-based overloads in .NET 8
+            bytesWritten = Encoding.UTF8.GetBytes(hlslSample, buffer[offset..]);
+        #endif
+
+        offset += bytesWritten;
+
         PS_FOOTER.CopyTo(buffer[offset..]);
         offset             += PS_FOOTER.Length;
         bw.blob = Compile(buffer[..offset], true, defines);

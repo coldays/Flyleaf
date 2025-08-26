@@ -7,6 +7,9 @@ using FlyleafLib.MediaFramework.MediaRemuxer;
 
 using static FlyleafLib.Logger;
 
+using FFmpeg.AutoGen;
+using static FFmpeg.AutoGen.ffmpeg;
+
 namespace FlyleafLib.MediaFramework.MediaDecoder;
 
 /* TODO
@@ -35,9 +38,9 @@ public unsafe partial class AudioDecoder : DecoderBase
     public ConcurrentQueue<AudioFrame>
                             Frames              { get; protected set; } = new();
 
-    static AVSampleFormat   AOutSampleFormat    = AVSampleFormat.S16;
+    static AVSampleFormat   AOutSampleFormat    = AVSampleFormat.AV_SAMPLE_FMT_S16;
     static string           AOutSampleFormatStr = av_get_sample_fmt_name(AOutSampleFormat);
-    static AVChannelLayout  AOutChannelLayout   = AV_CHANNEL_LAYOUT_STEREO;// new() { order = AVChannelOrder.Native, nb_channels = 2, u = new AVChannelLayout_u() { mask = AVChannel.for AV_CH_FRONT_LEFT | AV_CH_FRONT_RIGHT} };
+    static AVChannelLayout  AOutChannelLayout   = new() { order = AVChannelOrder.AV_CHANNEL_ORDER_NATIVE, nb_channels = 2, u = new AVChannelLayout_u() { mask = (ulong)AVChannel.AV_CHAN_FRONT_LEFT | (ulong)AVChannel.AV_CHAN_FRONT_RIGHT} };
     static int              AOutChannels        = AOutChannelLayout.nb_channels;
     static int              ASampleBytes        = av_get_bytes_per_sample(AOutSampleFormat) * AOutChannels;
 

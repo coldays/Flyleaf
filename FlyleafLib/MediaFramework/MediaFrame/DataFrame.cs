@@ -1,4 +1,6 @@
-﻿namespace FlyleafLib.MediaFramework.MediaFrame;
+﻿using FFmpeg.AutoGen;
+
+namespace FlyleafLib.MediaFramework.MediaFrame;
 
 public class DataFrame : FrameBase
 {

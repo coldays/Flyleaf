@@ -52,6 +52,6 @@ public class AppConfig
     }
 
     public void Save()
-        => File.WriteAllText(PATH, JsonSerializer.Serialize(this, Config.jsonOpts));
+        => File.WriteAllText(PATH, JsonSerializer.Serialize(this, new JsonSerializerOptions() { WriteIndented = true, }));
 
 }

@@ -277,13 +277,13 @@ public static partial class Utils
         MediaParts mp = new();
         int index = int.MaxValue; // title end pos
 
-        res = RxSeasonEpisode1().Match(title);
+        res = RxSeasonEpisode1.Match(title);
         if (!res.Success)
         {
-            res = RxSeasonEpisode2().Match(title);
+            res = RxSeasonEpisode2.Match(title);
 
             if (!res.Success)
-                res = RxEpisodePart().Match(title);
+                res = RxEpisodePart.Match(title);
         }
 
         if (res.Groups.Count > 1)
@@ -305,19 +305,19 @@ public static partial class Utils
             title = title[..(title.Length - mp.Extension.Length - 1)];
 
         // non-movie words, 1080p, 2015
-        if ((res = RxExtended().Match(title)).Index > 0 && res.Index < index)
+        if ((res = RxExtended.Match(title)).Index > 0 && res.Index < index)
             index = res.Index;
 
-        if ((res = RxDirectorsCut().Match(title)).Index > 0 && res.Index < index)
+        if ((res = RxDirectorsCut.Match(title)).Index > 0 && res.Index < index)
             index = res.Index;
 
-        if ((res = RxBrrip().Match(title)).Index > 0 && res.Index < index)
+        if ((res = RxBrrip.Match(title)).Index > 0 && res.Index < index)
             index = res.Index;
 
-        if ((res = RxResolution().Match(title)).Index > 0 && res.Index < index)
+        if ((res = RxResolution.Match(title)).Index > 0 && res.Index < index)
             index = res.Index;
 
-        res = RxYear().Match(title);
+        res = RxYear.Match(title);
         Group gc;
         if (res.Success && (gc = res.Groups["year"]).Index > 2)
         {
@@ -330,8 +330,8 @@ public static partial class Utils
             title = title[..index];
 
         title = title.Replace(".", " ").Replace("_", " ");
-        title = RxSpaces().Replace(title, " ");
-        title = RxNonAlphaNumeric().Replace(title, "");
+        title = RxSpaces.Replace(title, " ");
+        title = RxNonAlphaNumeric.Replace(title, "");
 
         mp.Title = title.Trim();
 
@@ -464,28 +464,28 @@ public static partial class Utils
     /// </summary>
     /// <param name="filepath">lnk file path</param>
     /// <returns>targetPath or null</returns>
-    public static string GetLnkTargetPath(string filepath)
-    {
-        try
-        {
-            // Using dynamic COM
-            // ref: https://stackoverflow.com/a/49198242/9070784
-            dynamic windowsShell = Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell", true)!);
-            dynamic shortcut = windowsShell!.CreateShortcut(filepath);
-            string targetPath = shortcut.TargetPath;
+    //public static string GetLnkTargetPath(string filepath)
+    //{
+    //    try
+    //    {
+    //        // Using dynamic COM
+    //        // ref: https://stackoverflow.com/a/49198242/9070784
+    //        dynamic windowsShell = Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell", true)!);
+    //        dynamic shortcut = windowsShell!.CreateShortcut(filepath);
+    //        string targetPath = shortcut.TargetPath;
 
-            if (string.IsNullOrEmpty(targetPath))
-                throw new InvalidOperationException("TargetPath is empty.");
+    //        if (string.IsNullOrEmpty(targetPath))
+    //            throw new InvalidOperationException("TargetPath is empty.");
 
-            return targetPath;
-        }
-        catch (Exception e)
-        {
-            Log($"Resolving Windows Link failed {e.Message} [FilePath: {filepath}]");
+    //        return targetPath;
+    //    }
+    //    catch (Exception e)
+    //    {
+    //        Log($"Resolving Windows Link failed {e.Message} [FilePath: {filepath}]");
 
-            return null;
-        }
-    }
+    //        return null;
+    //    }
+    //}
 
     public static string GetBytesReadable(nuint i)
     {
@@ -523,7 +523,7 @@ public static partial class Utils
             readable = i;
         }
         else
-            return i.ToString("0 B"); // Byte
+            return $"{i} B"; // Byte
 
         // Divide by 1024 to get fractional value
         readable /= 1024;
@@ -612,7 +612,7 @@ public static partial class Utils
     }
 
     public unsafe static string BytePtrToStringUTF8(byte* bytePtr)
-        => Marshal.PtrToStringUTF8((nint)bytePtr);
+        => Marshal.PtrToStringAnsi((nint)bytePtr);
 
     public static System.Windows.Media.Color WinFormsToWPFColor(System.Drawing.Color sColor)
         => System.Windows.Media.Color.FromArgb(sColor.A, sColor.R, sColor.G, sColor.B);
@@ -637,29 +637,26 @@ public static partial class Utils
     public static string TicksToTime(long ticks) => new TimeSpan(ticks).ToString();
     public static void Log(string msg) { try { Debug.WriteLine($"{DateTime.Now:HH.mm.ss.fff} | {msg}"); } catch (Exception) { Debug.WriteLine($"[............] [MediaFramework] {msg}"); } }
 
-    [GeneratedRegex("[^a-z0-9]extended", RegexOptions.IgnoreCase)]
-    private static partial Regex RxExtended();
-    [GeneratedRegex("[^a-z0-9]directors.cut", RegexOptions.IgnoreCase)]
-    private static partial Regex RxDirectorsCut();
-    [GeneratedRegex(@"(^|[^a-z0-9])(s|season)[^a-z0-9]*(?<season>[0-9]{1,2})[^a-z0-9]*(e|episode|part)[^a-z0-9]*(?<episode>[0-9]{1,2})($|[^a-z0-9])", RegexOptions.IgnoreCase)]
+    private static Regex RxExtended { get; } = new Regex("[^a-z0-9]extended", RegexOptions.IgnoreCase);
+
+    private static Regex RxDirectorsCut { get; } = new Regex("[^a-z0-9]directors.cut", RegexOptions.IgnoreCase);
 
     // s|season 01 ... e|episode|part 01
-    private static partial Regex RxSeasonEpisode1();
-    [GeneratedRegex(@"(^|[^a-z0-9])(?<season>[0-9]{1,2})x(?<episode>[0-9]{1,2})($|[^a-z0-9])", RegexOptions.IgnoreCase)]
-    // 01x01
-    private static partial Regex RxSeasonEpisode2();
-    // TODO: in case of single season should check only for e|episode|part 01
-    [GeneratedRegex(@"(^|[^a-z0-9])(episode|part)[^a-z0-9]*(?<episode>[0-9]{1,2})($|[^a-z0-9])", RegexOptions.IgnoreCase)]
-    private static partial Regex RxEpisodePart();
-    [GeneratedRegex("[^a-z0-9]brrip", RegexOptions.IgnoreCase)]
-    private static partial Regex RxBrrip();
+    private static Regex RxSeasonEpisode1 { get; } = new Regex(@"(^|[^a-z0-9])(s|season)[^a-z0-9]*(?<season>[0-9]{1,2})[^a-z0-9]*(e|episode|part)[^a-z0-9]*(?<episode>[0-9]{1,2})($|[^a-z0-9])", RegexOptions.IgnoreCase);
 
-    [GeneratedRegex("[^a-z0-9][0-9]{3,4}p", RegexOptions.IgnoreCase)]
-    private static partial Regex RxResolution();
-    [GeneratedRegex(@"[^a-z0-9](?<year>(19|20)[0-9][0-9])($|[^a-z0-9])", RegexOptions.IgnoreCase)]
-    private static partial Regex RxYear();
-    [GeneratedRegex(@"\s{2,}")]
-    private static partial Regex RxSpaces();
-    [GeneratedRegex(@"[^a-z0-9]$", RegexOptions.IgnoreCase)]
-    private static partial Regex RxNonAlphaNumeric();
+    // 01x01
+    private static Regex RxSeasonEpisode2 { get; } = new Regex(@"(^|[^a-z0-9])(?<season>[0-9]{1,2})x(?<episode>[0-9]{1,2})($|[^a-z0-9])", RegexOptions.IgnoreCase);
+    // TODO: in case of single season should check only for e|episode|part 01
+
+    private static Regex RxEpisodePart { get; } = new Regex(@"(^|[^a-z0-9])(episode|part)[^a-z0-9]*(?<episode>[0-9]{1,2})($|[^a-z0-9])", RegexOptions.IgnoreCase);
+
+    private static  Regex RxBrrip { get; } = new Regex("[^a-z0-9]brrip", RegexOptions.IgnoreCase);
+
+    private static  Regex RxResolution { get; } = new Regex("[^a-z0-9][0-9]{3,4}p", RegexOptions.IgnoreCase);
+
+    private static  Regex RxYear { get; } = new Regex(@"[^a-z0-9](?<year>(19|20)[0-9][0-9])($|[^a-z0-9])", RegexOptions.IgnoreCase);
+
+    private static  Regex RxSpaces { get; } = new Regex(@"\s{2,}");
+
+    private static  Regex RxNonAlphaNumeric { get; } = new Regex(@"[^a-z0-9]$", RegexOptions.IgnoreCase);
 }

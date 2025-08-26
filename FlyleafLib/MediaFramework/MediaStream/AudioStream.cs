@@ -1,5 +1,7 @@
 ﻿using FlyleafLib.MediaFramework.MediaDemuxer;
 
+using static FFmpeg.AutoGen.ffmpeg;
+
 namespace FlyleafLib.MediaFramework.MediaStream;
 
 public unsafe class AudioStream : StreamBase
@@ -27,7 +29,7 @@ public unsafe class AudioStream : StreamBase
         SampleFormatStr = av_get_sample_fmt_name(SampleFormat);
         SampleRate      = AVStream->codecpar->sample_rate;
 
-        if (AVStream->codecpar->ch_layout.order == AVChannelOrder.Unspec)
+        if (AVStream->codecpar->ch_layout.order == AVChannelOrder.AV_CHANNEL_ORDER_UNSPEC)
             av_channel_layout_default(&AVStream->codecpar->ch_layout, AVStream->codecpar->ch_layout.nb_channels);
 
         ChannelLayout   = AVStream->codecpar->ch_layout.u.mask;
@@ -36,8 +38,8 @@ public unsafe class AudioStream : StreamBase
 
         // https://trac.ffmpeg.org/ticket/7321
         CodecIDOrig = CodecID;
-        if (CodecID == AVCodecID.Mp2 && (SampleFormat == AVSampleFormat.Fltp || SampleFormat == AVSampleFormat.Flt))
-            CodecID = AVCodecID.Mp3; // OR? st->codecpar->format = (int) AVSampleFormat.AV_SAMPLE_FMT_S16P;
+        if (CodecID == AVCodecID.AV_CODEC_ID_MP2 && (SampleFormat == AVSampleFormat.AV_SAMPLE_FMT_FLTP || SampleFormat == AVSampleFormat.AV_SAMPLE_FMT_FLT))
+            CodecID = AVCodecID.AV_CODEC_ID_MP3; // OR? st->codecpar->format = (int) AVSampleFormat.AV_SAMPLE_FMT_S16P;
 
         byte[] buf = new byte[50];
         fixed (byte* bufPtr = buf)

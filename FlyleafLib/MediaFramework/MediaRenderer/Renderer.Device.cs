@@ -135,7 +135,7 @@ public unsafe partial class Renderer
                 // Finding User Definied adapter
                 if (!string.IsNullOrWhiteSpace(Config.Video.GPUAdapter) && !Config.Video.GPUAdapter.Equals("WARP", StringComparison.CurrentCultureIgnoreCase))
                 {
-                    for (uint i=0; Engine.Video.Factory.EnumAdapters1(i, out adapter).Success; i++)
+                    for (int i=0; Engine.Video.Factory.EnumAdapters1(i, out adapter).Success; i++)
                     {
                         if (adapter.Description1.Description == Config.Video.GPUAdapter)
                             break;
@@ -207,7 +207,7 @@ public unsafe partial class Renderer
                 using (var mthread    = Device.QueryInterface<ID3D11Multithread>()) mthread.SetMultithreadProtected(true);
                 using (var dxgidevice = Device.QueryInterface<IDXGIDevice1>())
                 {
-                    dxgidevice.MaximumFrameLatency = Config.Video.MaxFrameLatency;
+                    dxgidevice.MaximumFrameLatency = (int)Config.Video.MaxFrameLatency;
 
                     if (use2d)
                     {
@@ -234,7 +234,7 @@ public unsafe partial class Renderer
                     Usage           = ResourceUsage.Default,
                     BindFlags       = BindFlags.ConstantBuffer,
                     CPUAccessFlags  = CpuAccessFlags.None,
-                    ByteWidth       = (uint)(sizeof(VSBufferType) + (16 - (sizeof(VSBufferType) % 16)))
+                    ByteWidth       = (int)(sizeof(VSBufferType) + (16 - (sizeof(VSBufferType) % 16)))
                 });
                 context.VSSetConstantBuffer(0, vsBuffer);
 
@@ -248,13 +248,13 @@ public unsafe partial class Renderer
                     Usage           = ResourceUsage.Default,
                     BindFlags       = BindFlags.ConstantBuffer,
                     CPUAccessFlags  = CpuAccessFlags.None,
-                    ByteWidth       = (uint)(sizeof(PSBufferType) + (16 - (sizeof(PSBufferType) % 16)))
+                    ByteWidth       = (int)(sizeof(PSBufferType) + (16 - (sizeof(PSBufferType) % 16)))
                 });
                 context.PSSetConstantBuffer(0, psBuffer);
                 psBufferData.fieldType = FieldType;
 
                 // subs
-                ShaderBGRA = ShaderCompiler.CompilePS(Device, "bgra", @"color = float4(Texture1.Sample(Sampler, input.Texture).rgba);", null);
+                ShaderBGRA = ShaderCompiler.CompilePS(Device, "bgra", @"color = float4(Texture1.Sample(Sampler, input.Texture).rgba);".AsSpan(), null);
 
                 // Blend State (currently used -mainly- for RGBA images and OverlayTexture)
                 blendStateAlpha = Device.CreateBlendState(blendDesc);

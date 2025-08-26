@@ -1,11 +1,13 @@
 ﻿using System.Collections.Generic;
 using System.IO;
+#if NET5_0_OR_GREATER
 using System.Text.Json;
 using System.Text.Json.Serialization;
+#endif
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Data;
-
+using System.Xml.Serialization;
 using FlyleafLib.MediaFramework.MediaDecoder;
 using FlyleafLib.MediaFramework.MediaFrame;
 using FlyleafLib.MediaFramework.MediaRenderer;
@@ -21,8 +23,6 @@ namespace FlyleafLib;
 /// </summary>
 public class Config : NotifyPropertyChanged
 {
-    public static JsonSerializerOptions jsonOpts = new() { WriteIndented = true };
-
     public Config()
     {
         // Parse default plugin options to Config.Plugins (Creates instances until fix with statics in interfaces)
@@ -63,12 +63,19 @@ public class Config : NotifyPropertyChanged
     }
     public static Config Load(string path)
     {
-        Config config       = JsonSerializer.Deserialize<Config>(File.ReadAllText(path));
+#if NET5_0_OR_GREATER
+        Config config = JsonSerializer.Deserialize<Config>(File.ReadAllText(path));
+#else
+        using FileStream fs = new(path, FileMode.Open);
+        XmlSerializer xmlSerializer
+                            = new(typeof(Config));
+        Config config = (Config)xmlSerializer.Deserialize(fs);
+#endif
         config.Loaded       = true;
         config.LoadedPath   = path;
 
-        if (config.Audio.FiltersEnabled && Engine.Config.FFmpegLoadProfile == LoadProfile.Main)
-            config.Audio.FiltersEnabled = false;
+        //if (config.Audio.FiltersEnabled && Engine.Config.FFmpegLoadProfile == LoadProfile.Main)
+        //    config.Audio.FiltersEnabled = false;
 
         // Restore the plugin options initialized by the constructor, as they are overwritten after deserialization.
 
@@ -116,7 +123,15 @@ public class Config : NotifyPropertyChanged
             path = LoadedPath;
         }
 
-        File.WriteAllText(path, JsonSerializer.Serialize(this, jsonOpts));
+#if NET5_0_OR_GREATER
+        File.WriteAllText(path, JsonSerializer.Serialize(this, new JsonSerializerOptions() { WriteIndented = true }));
+#else
+        using FileStream fs = new(path, FileMode.Create);
+        XmlSerializer xmlSerializer
+                            = new(GetType());
+
+        xmlSerializer.Serialize(fs, this);
+#endif
     }
 
     internal void SetPlayer(Player player)
@@ -133,13 +148,19 @@ public class Config : NotifyPropertyChanged
     /// <summary>
     /// Whether configuration has been loaded from file
     /// </summary>
+    [XmlIgnore]
+#if NET5_0_OR_GREATER
     [JsonIgnore]
+#endif
     public bool             Loaded      { get; private set; }
 
     /// <summary>
     /// The path that this configuration has been loaded from
     /// </summary>
+    [XmlIgnore]
+#if NET5_0_OR_GREATER
     [JsonIgnore]
+#endif
     public string           LoadedPath  { get; private set; }
 
     public PlayerConfig     Player      { get; set; } = new();
@@ -447,7 +468,7 @@ public class Config : NotifyPropertyChanged
         /// FFmpeg's format flags for demuxer (see https://ffmpeg.org/doxygen/trunk/avformat_8h.html)
         /// eg. FormatFlags |= 0x40; // For AVFMT_FLAG_NOBUFFER
         /// </summary>
-        public DemuxerFlags     FormatFlags     { get; set; } = DemuxerFlags.DiscardCorrupt;// FFmpeg.AutoGen.ffmpeg.AVFMT_FLAG_DISCARD_CORRUPT;
+        public int     FormatFlags     { get; set; } = ffmpeg.AVFMT_FLAG_DISCARD_CORRUPT;
 
         /// <summary>
         /// Certain muxers and demuxers do nesting (they open one or more additional internal format contexts). This will pass the FormatOpt and HTTPQuery params to the underlying contexts)
@@ -661,7 +682,10 @@ public class Config : NotifyPropertyChanged
         /// <summary>
         /// The max resolution that the current system can achieve and will be used from the input/stream suggester plugins
         /// </summary>
+        [XmlIgnore]
+#if NET5_0_OR_GREATER
         [JsonIgnore]
+#endif
         public int              MaxVerticalResolutionAuto   { get; internal set; }
 
         /// <summary>
@@ -673,7 +697,10 @@ public class Config : NotifyPropertyChanged
         /// <summary>
         /// The max resolution that is currently used (based on Auto/Custom)
         /// </summary>
+        [XmlIgnore]
+#if NET5_0_OR_GREATER
         [JsonIgnore]
+#endif
         public int              MaxVerticalResolution       => MaxVerticalResolutionCustom == 0 ? (MaxVerticalResolutionAuto != 0 ? MaxVerticalResolutionAuto : 1080) : MaxVerticalResolutionCustom;
 
         /// <summary>
@@ -808,7 +835,7 @@ public class Config : NotifyPropertyChanged
         /// 1. Requires FFmpeg avfilter lib<br/>
         /// 2. Currently SWR performs better if you dont need filters<br/>
         /// </summary>
-        public bool             FiltersEnabled      { get => _FiltersEnabled; set { if (Set(ref _FiltersEnabled, value && Engine.Config.FFmpegLoadProfile != LoadProfile.Main)) player?.AudioDecoder.SetupFiltersOrSwr(); } }
+        public bool             FiltersEnabled      { get => _FiltersEnabled; set { if (Set(ref _FiltersEnabled, value)) player?.AudioDecoder.SetupFiltersOrSwr(); } }
         bool _FiltersEnabled = false;
 
         /// <summary>
@@ -886,7 +913,10 @@ public class Config : NotifyPropertyChanged
         /// <summary>
         /// Subtitles parser (can be used for custom parsing)
         /// </summary>
+        [XmlIgnore]
+#if NET5_0_OR_GREATER
         [JsonIgnore]
+#endif
         public Action<SubtitlesFrame>
                                 Parser              { get; set; } = ParseSubtitles.Parse;
     }
@@ -935,8 +965,8 @@ public class EngineConfig
     /// Filters<br/>
     /// Main<br/>
     /// </summary>
-    public LoadProfile
-                    FFmpegLoadProfile       { get; set; } = LoadProfile.All;
+    //public LoadProfile
+    //                FFmpegLoadProfile       { get; set; } = LoadProfile.All;
 
     /// <summary>
     /// Whether to allow HLS live seeking (this can cause segmentation faults in case of incompatible ffmpeg version with library's custom structures)
@@ -946,20 +976,26 @@ public class EngineConfig
     /// <summary>
     /// Sets FFmpeg logger's level
     /// </summary>
-    public Flyleaf.FFmpeg.LogLevel
+    public FFmpegLogLevel
                     FFmpegLogLevel          { get => _FFmpegLogLevel; set { _FFmpegLogLevel = value; if (Engine.IsLoaded) FFmpegEngine.SetLogLevel(); } }
-    Flyleaf.FFmpeg.LogLevel _FFmpegLogLevel = Flyleaf.FFmpeg.LogLevel.Quiet;
+    FFmpegLogLevel _FFmpegLogLevel = FFmpegLogLevel.Quiet;
 
     /// <summary>
     /// Whether configuration has been loaded from file
     /// </summary>
+    [XmlIgnore]
+#if NET5_0_OR_GREATER
     [JsonIgnore]
+#endif
     public bool     Loaded                  { get; private set; }
 
     /// <summary>
     /// The path that this configuration has been loaded from
     /// </summary>
+    [XmlIgnore]
+#if NET5_0_OR_GREATER
     [JsonIgnore]
+#endif
     public string   LoadedPath              { get; private set; }
 
     /// <summary>
@@ -1023,7 +1059,14 @@ public class EngineConfig
     /// <returns></returns>
     public static EngineConfig Load(string path)
     {
+#if NET5_0_OR_GREATER
         EngineConfig config = JsonSerializer.Deserialize<EngineConfig>(File.ReadAllText(path));
+#else
+        using FileStream fs = new(path, FileMode.Open);
+        XmlSerializer xmlSerializer
+                            = new(typeof(EngineConfig));
+        EngineConfig config = (EngineConfig)xmlSerializer.Deserialize(fs);
+#endif
         config.Loaded       = true;
         config.LoadedPath   = path;
 
@@ -1044,6 +1087,14 @@ public class EngineConfig
             path = LoadedPath;
         }
 
-        File.WriteAllText(path, JsonSerializer.Serialize(this, Config.jsonOpts));
+#if NET5_0_OR_GREATER
+        File.WriteAllText(path, JsonSerializer.Serialize(this, new JsonSerializerOptions() { WriteIndented = true, }));
+#else
+        using FileStream fs = new(path, FileMode.Create);
+        XmlSerializer xmlSerializer
+                            = new(GetType());
+
+        xmlSerializer.Serialize(fs, this);
+#endif
     }
 }

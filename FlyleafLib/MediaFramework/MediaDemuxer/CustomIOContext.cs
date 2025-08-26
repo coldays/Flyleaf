@@ -2,6 +2,10 @@
 
 namespace FlyleafLib.MediaFramework.MediaDemuxer;
 
+using FFmpeg.AutoGen;
+using System.Runtime.InteropServices;
+using static FFmpeg.AutoGen.ffmpeg;
+
 public unsafe class CustomIOContext
 {
     AVIOContext*    avioCtx;
@@ -22,7 +26,7 @@ public unsafe class CustomIOContext
         ioseek = IOSeek;
         avioCtx = avio_alloc_context((byte*)av_malloc((nuint)demuxer.Config.IOStreamBufferSize), demuxer.Config.IOStreamBufferSize, 0, null, ioread, null, ioseek);
         demuxer.FormatContext->pb     = avioCtx;
-        demuxer.FormatContext->flags |= FmtFlags2.CustomIo;
+        demuxer.FormatContext->flags |= AVFMT_FLAG_CUSTOM_IO;
     }
 
     public void Dispose()
@@ -47,7 +51,9 @@ public unsafe class CustomIOContext
 
         if (demuxer.Interrupter.ShouldInterrupt(null) != 0) return AVERROR_EXIT;
 
-        ret = demuxer.CustomIOContext.stream.Read(new Span<byte>(buffer, bufferSize));
+        byte[] managedBuffer = new byte[bufferSize];
+        Marshal.Copy((IntPtr)buffer, managedBuffer, 0, bufferSize);
+        ret = demuxer.CustomIOContext.stream.Read(managedBuffer, 0, bufferSize);
 
         if (ret > 0)
             return ret;
@@ -60,11 +66,11 @@ public unsafe class CustomIOContext
         return AVERROR_EXIT;
     }
 
-    long IOSeek(void* opaque, long offset, IOSeekFlags whence)
+    long IOSeek(void* opaque, long offset, int whence)
     {
         //System.Diagnostics.Debug.WriteLine($"** S | {decCtx.demuxer.fmtCtx->pb->pos} - {decCtx.demuxer.ioStream.Position}");
 
-        return whence == IOSeekFlags.Size
+        return whence == AVSEEK_SIZE
             ? demuxer.CustomIOContext.stream.Length
             : demuxer.CustomIOContext.stream.Seek(offset, (SeekOrigin) whence);
     }

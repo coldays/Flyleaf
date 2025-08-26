@@ -125,7 +125,7 @@ unsafe public partial class Renderer
                     if (vpe == null)
                         return false;
 
-                    vd1.CreateVideoProcessor(vpe, (uint)curVPCC.TypeIndex, out vp);
+                    vd1.CreateVideoProcessor(vpe, curVPCC.TypeIndex, out vp);
 
                     return true;
                 }
@@ -195,9 +195,9 @@ unsafe public partial class Renderer
                     dump += $"{cap,-25} {((vpCaps.AutoStreamCaps & cap) != 0 ? "yes" : "no")}\r\n";
             }
 
-            uint typeIndex = 0;
+            int typeIndex = 0;
             VideoProcessorRateConversionCaps rcCap = new();
-            for (uint i = 0; i < vpCaps.RateConversionCapsCount; i++)
+            for (int i = 0; i < vpCaps.RateConversionCapsCount; i++)
             {
                 vpe.GetVideoProcessorRateConversionCaps(i, out rcCap);
                 VideoProcessorProcessorCaps pCaps = (VideoProcessorProcessorCaps) rcCap.ProcessorCaps;

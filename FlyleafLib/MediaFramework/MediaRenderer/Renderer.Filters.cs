@@ -1,7 +1,9 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+#if NET5_0_OR_GREATER
 using System.Text.Json.Serialization;
-
+#endif
+using System.Xml.Serialization;
 using Vortice.Direct3D11;
 
 using static FlyleafLib.Utils;
@@ -248,7 +250,10 @@ public abstract class VideoFilter : NotifyPropertyChanged
 {
     // NOTE: Don't touch public (constructor/properties) required for serialization
 
-    [JsonIgnore]
+    [XmlIgnore]
+    #if NET5_0_OR_GREATER
+        [JsonIgnore]
+    #endif
     public bool         Available   => filter != null;
     internal VideoFilterLocal filter;
     internal void SetFilter(Renderer renderer, VideoFilterLocal filter)

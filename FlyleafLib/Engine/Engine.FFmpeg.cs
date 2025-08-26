@@ -1,4 +1,7 @@
-﻿namespace FlyleafLib;
+﻿using FFmpeg.AutoGen;
+using static FFmpeg.AutoGen.ffmpeg;
+
+namespace FlyleafLib;
 
 public class FFmpegEngine
 {
@@ -14,14 +17,14 @@ public class FFmpegEngine
         {
             Engine.Log.Info($"Loading FFmpeg libraries from '{Engine.Config.FFmpegPath}'");
             Folder = Utils.GetFolderPath(Engine.Config.FFmpegPath);
-            LoadLibraries(Folder, Engine.Config.FFmpegLoadProfile);
+            RootPath = Folder;
 
             uint ver = avformat_version();
             Version = $"{ver >> 16}.{(ver >> 8) & 255}.{ver & 255}";
 
             SetLogLevel();
             AV_TIMEBASE_Q   = av_get_time_base_q();
-            Engine.Log.Info($"FFmpeg Loaded (Profile: {Engine.Config.FFmpegLoadProfile}, Location: {Folder}, FmtVer: {Version})");
+            Engine.Log.Info($"FFmpeg Loaded (Location: {Folder}, FmtVer: {Version})");
         } catch (Exception e)
         {
             Engine.Log.Error($"Loading FFmpeg libraries '{Engine.Config.FFmpegPath}' failed\r\n{e.Message}\r\n{e.StackTrace}");
@@ -31,14 +34,14 @@ public class FFmpegEngine
 
     internal static void SetLogLevel()
     {
-        if (Engine.Config.FFmpegLogLevel != Flyleaf.FFmpeg.LogLevel.Quiet)
+        if (Engine.Config.FFmpegLogLevel != FFmpegLogLevel.Quiet)
         {
-            av_log_set_level(Engine.Config.FFmpegLogLevel);
+            av_log_set_level((int)Engine.Config.FFmpegLogLevel);
             av_log_set_callback(LogFFmpeg);
         }
         else
         {
-            av_log_set_level(Flyleaf.FFmpeg.LogLevel.Quiet);
+            av_log_set_level((int)FFmpegLogLevel.Quiet);
             av_log_set_callback(null);
         }
     }
@@ -62,4 +65,19 @@ public class FFmpegEngine
         av_strerror(error, buffer, AV_LOG_BUFFER_SIZE);
         return Utils.BytePtrToStringUTF8(buffer);
     }
+}
+
+public enum FFmpegLogLevel
+{
+    Quiet = -0x08,
+    SkipRepeated = 0x01,
+    PrintLevel = 0x02,
+    Fatal = 0x08,
+    Error = 0x10,
+    Warning = 0x18,
+    Info = 0x20,
+    Verbose = 0x28,
+    Debug = 0x30,
+    Trace = 0x38,
+    MaxOffset = 0x40,
 }

@@ -1,4 +1,5 @@
-﻿using Vortice.Direct3D11;
+﻿using FFmpeg.AutoGen;
+using Vortice.Direct3D11;
 
 using ID3D11Texture2D = Vortice.Direct3D11.ID3D11Texture2D;
 

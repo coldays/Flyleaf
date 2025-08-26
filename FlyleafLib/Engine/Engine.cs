@@ -155,11 +155,11 @@ public static class Engine
 
         IsLoaded= true;
 
-        if (Config.FFmpegLoadProfile == LoadProfile.All) // Cap Devices (TBR: if UI required)
-        {
-            Audio.RefreshCapDevices();
-            Video.RefreshCapDevices();
-        }
+        //if (Config.FFmpegLoadProfile == LoadProfile.All) // Cap Devices (TBR: if UI required)
+        //{
+        //    Audio.RefreshCapDevices();
+        //    Video.RefreshCapDevices();
+        //}
 
         Loaded?.Invoke(null, null);
 

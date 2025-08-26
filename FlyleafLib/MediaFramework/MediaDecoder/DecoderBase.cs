@@ -1,7 +1,10 @@
-﻿using FlyleafLib.MediaFramework.MediaDemuxer;
+﻿using FFmpeg.AutoGen;
+using FlyleafLib.MediaFramework.MediaDemuxer;
 using FlyleafLib.MediaFramework.MediaStream;
 
 namespace FlyleafLib.MediaFramework.MediaDecoder;
+
+using static FFmpeg.AutoGen.ffmpeg;
 
 public abstract unsafe class DecoderBase : RunThreadBase
 {
@@ -73,7 +76,7 @@ public abstract unsafe class DecoderBase : RunThreadBase
                 if (stream is not DataStream) // if we don't open/use a data codec context why not just push the Data Frames directly from the Demuxer? no need to have DataDecoder*
                 {
                     // avcodec_find_decoder will use libdav1d which does not support hardware decoding (software fallback with openStream = false from av1 to default:libdav1d) [#340]
-                    var codec = stream.CodecID == AVCodecID.Av1 && openStream && Config.Video.VideoAcceleration ? avcodec_find_decoder_by_name("av1") : avcodec_find_decoder(stream.CodecID);
+                    var codec = stream.CodecID == AVCodecID.AV_CODEC_ID_AV1 && openStream && Config.Video.VideoAcceleration ? avcodec_find_decoder_by_name("av1") : avcodec_find_decoder(stream.CodecID);
                     if (codec == null)
                         return error = $"[{Type} avcodec_find_decoder] No suitable codec found";
 
@@ -89,10 +92,10 @@ public abstract unsafe class DecoderBase : RunThreadBase
                     codecCtx->codec_id      = codec->id; // avcodec_parameters_to_context will change this we need to set Stream's Codec Id (eg we change mp2 to mp3)
 
                     if (Config.Decoder.ShowCorrupted)
-                        codecCtx->flags |= CodecFlags.OutputCorrupt;
+                        codecCtx->flags |= AV_CODEC_FLAG_OUTPUT_CORRUPT;
 
                     if (Config.Decoder.LowDelay)
-                        codecCtx->flags |= CodecFlags.LowDelay;
+                        codecCtx->flags |= AV_CODEC_FLAG_LOW_DELAY;
 
                     try { ret = Setup(codec); } catch(Exception e) { return error = $"[{Type} Setup] {e.Message}"; }
                     if (ret < 0)
@@ -111,7 +114,7 @@ public abstract unsafe class DecoderBase : RunThreadBase
                         {
                             AVDictionaryEntry *t = null;
 
-                            while ((t = av_dict_get(avopt, "", t, DictReadFlags.IgnoreSuffix)) != null)
+                            while ((t = av_dict_get(avopt, "", t, AV_DICT_IGNORE_SUFFIX)) != null)
                                 Log.Debug($"Ignoring codec option {Utils.BytePtrToStringUTF8(t->key)}");
                         }
 

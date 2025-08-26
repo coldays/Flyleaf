@@ -56,7 +56,7 @@ public partial class Renderer
 
             if (frame.avFrame != null)
             {
-                vpivd.Texture2D.ArraySlice = (uint) frame.avFrame->data[1];
+                vpivd.Texture2D.ArraySlice = (int) frame.avFrame->data[1];
                 vd1.CreateVideoProcessorInputView(VideoDecoder.textureFFmpeg, vpe, vpivd, out vpiv);
             }
             else
@@ -118,10 +118,10 @@ public partial class Renderer
                     singleStage?.Dispose();
                     singleGpuRtv?.Dispose();
 
-                    singleStageDesc.Width   = (uint)width;
-                    singleStageDesc.Height  = (uint)height;
-                    singleGpuDesc.Width     = (uint)width;
-                    singleGpuDesc.Height    = (uint)height;
+                    singleStageDesc.Width   = width;
+                    singleStageDesc.Height  = height;
+                    singleGpuDesc.Width     = width;
+                    singleGpuDesc.Height    = height;
 
                     singleStage = Device.CreateTexture2D(singleStageDesc);
                     singleGpu   = Device.CreateTexture2D(singleGpuDesc);
@@ -206,10 +206,10 @@ public partial class Renderer
                     singleStage?.Dispose();
                     singleGpuRtv?.Dispose();
 
-                    singleStageDesc.Width   = (uint)width;
-                    singleStageDesc.Height  = (uint)height;
-                    singleGpuDesc.Width     = (uint)width;
-                    singleGpuDesc.Height    = (uint)height;
+                    singleStageDesc.Width   = width;
+                    singleStageDesc.Height  = height;
+                    singleGpuDesc.Width     = width;
+                    singleGpuDesc.Height    = height;
 
                     singleStage = Device.CreateTexture2D(singleStageDesc);
                     singleGpu = Device.CreateTexture2D(singleGpuDesc);
@@ -280,8 +280,8 @@ public partial class Renderer
         Texture2DDescription stageDesc = new()
         {
             Usage       = ResourceUsage.Staging,
-            Width       = VideoDecoder.VideoStream.Width,
-            Height      = VideoDecoder.VideoStream.Height,
+            Width       = (int)VideoDecoder.VideoStream.Width,
+            Height      = (int)VideoDecoder.VideoStream.Height,
             Format      = Format.B8G8R8A8_UNorm,
             ArraySize   = 1,
             MipLevels   = 1,
@@ -338,8 +338,8 @@ public partial class Renderer
                 Usage       = ResourceUsage.Default,
                 BindFlags   = BindFlags.RenderTarget,
                 Format      = Format.B8G8R8A8_UNorm,
-                Width       = VideoStream.Width,
-                Height      = VideoStream.Height,
+                Width       = (int)VideoStream.Width,
+                Height      = (int)VideoStream.Height,
 
                 ArraySize   = 1,
                 MipLevels   = 1,

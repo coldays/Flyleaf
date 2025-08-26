@@ -75,7 +75,7 @@ namespace FlyleafLib.Controls.WPF
             if (!string.IsNullOrEmpty(uiConfigPath))
             {
                 flyleaf.UIConfig.ActivityTimeout = flyleaf.ActivityTimeout;
-                File.WriteAllText(uiConfigPath, JsonSerializer.Serialize(flyleaf.UIConfig, Config.jsonOpts));
+                File.WriteAllText(uiConfigPath, JsonSerializer.Serialize(flyleaf.UIConfig, new JsonSerializerOptions() { WriteIndented = true, }));
             }
 
             if (!string.IsNullOrEmpty(configPath) && flyleaf.Config != null)

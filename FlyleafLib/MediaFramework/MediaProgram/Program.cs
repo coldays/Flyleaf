@@ -4,6 +4,8 @@ using System.Linq;
 using FlyleafLib.MediaFramework.MediaDemuxer;
 using FlyleafLib.MediaFramework.MediaStream;
 
+using static FFmpeg.AutoGen.ffmpeg;
+
 namespace FlyleafLib.MediaFramework.MediaProgram;
 
 public class Program
@@ -50,7 +52,7 @@ public class Program
         AVDictionaryEntry* b = null;
         while (true)
         {
-            b = av_dict_get(program->metadata, "", b, DictReadFlags.IgnoreSuffix);
+            b = av_dict_get(program->metadata, "", b, AV_DICT_IGNORE_SUFFIX);
             if (b == null) break;
             metadata.Add(Utils.BytePtrToStringUTF8(b->key), Utils.BytePtrToStringUTF8(b->value));
         }

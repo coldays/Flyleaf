@@ -1,6 +1,7 @@
-﻿using System.Collections.Generic;
-
-using FlyleafLib.MediaFramework.MediaDemuxer;
+﻿using FlyleafLib.MediaFramework.MediaDemuxer;
+using System.Collections.Generic;
+using static FFmpeg.AutoGen.ffmpeg;
+using static FFmpeg.AutoGen.ffmpegEx;
 
 namespace FlyleafLib.MediaFramework.MediaStream;
 
@@ -10,7 +11,7 @@ public abstract unsafe class StreamBase : NotifyPropertyChanged
 
     public Demuxer                      Demuxer             { get; internal set; }
     public AVStream*                    AVStream            { get; internal set; }
-    internal playlist*                  HLSPlaylist         { get; set; }
+    internal HLSPlaylist*                  HLSPlaylist         { get; set; }
     public int                          StreamIndex         { get; internal set; } = -1;
     public double                       Timebase            { get; internal set; }
 
@@ -54,7 +55,7 @@ public abstract unsafe class StreamBase : NotifyPropertyChanged
         {
             for (int i=0; i<Demuxer.hlsCtx->n_playlists; i++)
             {
-                playlist** playlists = Demuxer.hlsCtx->playlists;
+                HLSPlaylist** playlists = (HLSPlaylist**)Demuxer.hlsCtx->playlists;
                 for (int l=0; l<playlists[i]->n_main_streams; l++)
                     if (playlists[i]->main_streams[l]->index == StreamIndex)
                     {
@@ -70,7 +71,7 @@ public abstract unsafe class StreamBase : NotifyPropertyChanged
         AVDictionaryEntry* b = null;
         while (true)
         {
-            b = av_dict_get(AVStream->metadata, "", b, DictReadFlags.IgnoreSuffix);
+            b = av_dict_get(AVStream->metadata, "", b, AV_DICT_IGNORE_SUFFIX);
             if (b == null) break;
             Metadata.Add(Utils.BytePtrToStringUTF8(b->key), Utils.BytePtrToStringUTF8(b->value));
         }

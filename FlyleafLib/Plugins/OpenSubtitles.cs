@@ -32,7 +32,7 @@ public class OpenSubtitles : PluginBase, IOpenSubtitles, ISearchLocalSubtitles
 
                 if (!title.Contains($".{Language.Unknown.IdSubLanguage}.utf8"))
                     foreach (var lang2 in Config.Subtitles.Languages)
-                        if (title.Contains($".{lang2.IdSubLanguage}.utf8", StringComparison.OrdinalIgnoreCase))
+                        if (title.Contains($".{lang2.IdSubLanguage}.utf8"))
                             { lang = lang2; break; }
             }
             else if (Utils.ExtensionsSubtitlesBitmap.Contains(Utils.GetUrlExtention(title)))
@@ -127,7 +127,7 @@ public class OpenSubtitles : PluginBase, IOpenSubtitles, ISearchLocalSubtitles
 
                     if (!title.Contains($".{Language.Unknown.IdSubLanguage}.utf8"))
                         foreach (var lang2 in Config.Subtitles.Languages)
-                            if (title.Contains($".{lang2.IdSubLanguage}.utf8", StringComparison.OrdinalIgnoreCase))
+                            if (title.Contains($".{lang2.IdSubLanguage}.utf8"))
                                 { lang = lang2; break; }
                 }
 
