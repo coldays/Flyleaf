@@ -17,7 +17,7 @@ internal static partial class ShaderCompiler
     const int               MAX_CACHE_SIZE  = 64;
     const string            MAIN            = "main";
     const string            LOG_PREFIX      = "[ShaderCompiler] ";
-    static readonly string  SHADERVER       = Environment.OSVersion.Version.Major >= 10 ? "_5_0" : "_4_0_level_9_3";
+    static readonly string  SHADERVER       = "_5_0";
     static readonly string  PSVER           = $"ps{SHADERVER}";
     static readonly string  VSVER           = $"vs{SHADERVER}";
     internal static Blob    VSBlob          = Compile(VS, false);
@@ -63,17 +63,12 @@ internal static partial class ShaderCompiler
         PS_HEADER.CopyTo(buffer);
         int offset          = PS_HEADER.Length;
 
-        int bytesWritten;
-
-#if NETFRAMEWORK
-        char[] charArray = hlslSample.ToArray();
-        bytesWritten = Encoding.UTF8.GetBytes(charArray, 0, charArray.Length, bufferPool, offset);
-        #else
-            // Use Span-based overloads in .NET 8
-            bytesWritten = Encoding.UTF8.GetBytes(hlslSample, buffer[offset..]);
-        #endif
-
-        offset += bytesWritten;
+        byte[] utf8Bytes = Encoding.UTF8.GetBytes(hlslSample.ToArray());
+        for (int i = 0; i < utf8Bytes.Length; i++)
+        {
+            bufferPool[i + offset] = utf8Bytes[i];
+        }
+        offset += utf8Bytes.Length;
 
         PS_FOOTER.CopyTo(buffer[offset..]);
         offset             += PS_FOOTER.Length;
