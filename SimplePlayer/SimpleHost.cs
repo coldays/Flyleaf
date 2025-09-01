@@ -58,15 +58,12 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
     Point _zeroPoint = new(0, 0);
     Point _mouseLeftDownPoint = new(0, 0);
     Point _mouseMoveLastPoint = new(0, 0);
-    Point _ownerZeroPointPos = new();
 
     Rect _zeroRect = new(0, 0, 0, 0);
     Rect _rectInit;
     Rect _rectInitLast = rectRandom;
     Rect _rectIntersect;
     Rect _rectIntersectLast = rectRandom;
-    RECT _beforeResizeRect = new();
-    RECT _curRect = new();
     private Window _overlay;
 
     protected readonly LogHandler Log;
