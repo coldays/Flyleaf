@@ -110,22 +110,6 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
     public static readonly DependencyProperty PanZoomOnCtrlWheelProperty =
         DependencyProperty.Register(nameof(PanZoomOnCtrlWheel), typeof(AvailableWindows), typeof(SimpleHost), new PropertyMetadata(AvailableWindows.Surface));
 
-    public int PreferredLandscapeWidth
-    {
-        get { return (int)GetValue(PreferredLandscapeWidthProperty); }
-        set { SetValue(PreferredLandscapeWidthProperty, value); }
-    }
-    public static readonly DependencyProperty PreferredLandscapeWidthProperty =
-    DependencyProperty.Register(nameof(PreferredLandscapeWidth), typeof(int), typeof(SimpleHost), new PropertyMetadata(0));
-
-    public int PreferredPortraitHeight
-    {
-        get { return (int)GetValue(PreferredPortraitHeightProperty); }
-        set { SetValue(PreferredPortraitHeightProperty, value); }
-    }
-    public static readonly DependencyProperty PreferredPortraitHeightProperty =
-    DependencyProperty.Register(nameof(PreferredPortraitHeight), typeof(int), typeof(SimpleHost), new PropertyMetadata(0));
-
     public AvailableWindows KeyBindings
     {
         get => (AvailableWindows)GetValue(KeyBindingsProperty);
