@@ -172,14 +172,6 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
     public static readonly DependencyProperty IsPanMovingProperty =
         DependencyProperty.Register(nameof(IsPanMoving), typeof(bool), typeof(SimpleHost), new PropertyMetadata(false));
 
-    public bool IsDragMoving
-    {
-        get { return (bool)GetValue(IsDragMovingProperty); }
-        set { SetValue(IsDragMovingProperty, value); }
-    }
-    public static readonly DependencyProperty IsDragMovingProperty =
-        DependencyProperty.Register(nameof(IsDragMoving), typeof(bool), typeof(SimpleHost), new PropertyMetadata(false));
-
     public FrameworkElement MarginTarget
     {
         get => (FrameworkElement)GetValue(MarginTargetProperty);
@@ -684,29 +676,25 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
     private void Overlay_LostMouseCapture(object sender, MouseEventArgs e) => Overlay_ReleaseCapture();
     private void Surface_ReleaseCapture()
     {
-        if (!IsPanMoving && !IsDragMoving)
+        if (!IsPanMoving)
             return;
 
         Surface.ReleaseMouseCapture();
 
         if (IsPanMoving)
             IsPanMoving = false;
-        else if (IsDragMoving)
-            IsDragMoving = false;
         else
             return;
     }
     private void Overlay_ReleaseCapture()
     {
-        if (!IsPanMoving && !IsDragMoving)
+        if (!IsPanMoving)
             return;
 
         _overlay.ReleaseMouseCapture();
 
         if (IsPanMoving)
             IsPanMoving = false;
-        else if (IsDragMoving)
-            IsDragMoving = false;
     }
 
     private void Surface_MouseMove(object sender, MouseEventArgs e)
@@ -747,16 +735,6 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
             //);
 
             return;
-        }
-
-        // Drag Move Self (Attached|Detached)
-        if (IsDragMoving)
-        {
-            MarginTarget.Margin = new(
-                    MarginTarget.Margin.Left + cur.X - _mouseLeftDownPoint.X,
-                    MarginTarget.Margin.Top + cur.Y - _mouseLeftDownPoint.Y,
-                    MarginTarget.Margin.Right,
-                    MarginTarget.Margin.Bottom);
         }
     }
 
