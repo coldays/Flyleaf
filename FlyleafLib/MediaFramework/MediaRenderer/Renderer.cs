@@ -123,6 +123,12 @@ public partial class Renderer : NotifyPropertyChanged, IDisposable
     {
         lock(lockDevice)
         {
+            if (zoom < 1)
+            {
+                ResetPanAndZoom(refresh);
+                return;
+            }
+
             this.zoom = zoom;
 
             if (Disposed)
@@ -152,6 +158,12 @@ public partial class Renderer : NotifyPropertyChanged, IDisposable
     {
         lock(lockDevice)
         {
+            if (zoom < 1)
+            {
+                ResetPanAndZoom(refresh);
+                return;
+            }
+
             this.zoom = zoom;
             zoomCenter = p;
 
@@ -178,6 +190,19 @@ public partial class Renderer : NotifyPropertyChanged, IDisposable
             if (refresh)
                 SetViewport();
         }
+    }
+
+    private void ResetPanAndZoom(bool refresh = true)
+    {
+        panXOffset = panYOffset = 0;
+        zoom = 1;
+        zoomCenter = ZoomCenterPoint;
+
+        if (Disposed)
+            return;
+
+        if (refresh)
+            SetViewport(refresh);
     }
 
     public int              UniqueId        { get; private set; }
