@@ -49,8 +49,6 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
     static nint NONE_STYLE = (nint)(WindowStyles.WS_MINIMIZEBOX | WindowStyles.WS_CLIPSIBLINGS | WindowStyles.WS_CLIPCHILDREN | WindowStyles.WS_VISIBLE); // WS_MINIMIZEBOX required for swapchain
     static Rect rectRandom = new(1, 2, 3, 4);
 
-    float _curResizeRatio;
-    float _curResizeRatioIfEnabled;
     bool _surfaceClosed, _surfaceClosing, _overlayClosed;
     int _panPrevX, _panPrevY;
     bool _isMouseBindingsSubscribedSurface;
@@ -115,14 +113,6 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
     }
     public static readonly DependencyProperty PanZoomOnCtrlWheelProperty =
         DependencyProperty.Register(nameof(PanZoomOnCtrlWheel), typeof(AvailableWindows), typeof(SimpleHost), new PropertyMetadata(AvailableWindows.Surface));
-
-    public bool KeepRatioOnResize
-    {
-        get => (bool)GetValue(KeepRatioOnResizeProperty);
-        set => SetValue(KeepRatioOnResizeProperty, value);
-    }
-    public static readonly DependencyProperty KeepRatioOnResizeProperty =
-        DependencyProperty.Register(nameof(KeepRatioOnResize), typeof(bool), typeof(SimpleHost), new PropertyMetadata(false, new PropertyChangedCallback(OnKeepRatioOnResizeChanged)));
 
     public int PreferredLandscapeWidth
     {
@@ -243,23 +233,6 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
 
         host._overlay.AllowDrop =
             host.OpenOnDrop == AvailableWindows.Overlay || host.OpenOnDrop == AvailableWindows.Both;
-    }
-    private void UpdateCurRatio()
-    {
-        if (!false)
-            return;
-    }
-    private static void OnKeepRatioOnResizeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-    {
-        if (isDesginMode)
-            return;
-
-        SimpleHost host = d as SimpleHost;
-        if (host.Disposed)
-            return;
-
-        if (!false)
-            host._curResizeRatioIfEnabled = 0;
     }
     private static void OnPlayerChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
@@ -891,8 +864,6 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
 
             Player.VideoDecoder.CreateSwapChain(SurfaceHandle);
         }
-
-        UpdateCurRatio();
     }
     public virtual void SetSurface(bool fromSetOverlay = false)
     {
