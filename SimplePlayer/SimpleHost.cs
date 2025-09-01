@@ -164,14 +164,6 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
     public static readonly DependencyProperty ActivityTimeoutProperty =
         DependencyProperty.Register(nameof(ActivityTimeout), typeof(int), typeof(SimpleHost), new PropertyMetadata(0, new PropertyChangedCallback(OnActivityTimeoutChanged)));
 
-    public bool IsResizing
-    {
-        get => (bool)GetValue(IsResizingProperty);
-        private set => SetValue(IsResizingProperty, value);
-    }
-    public static readonly DependencyProperty IsResizingProperty =
-        DependencyProperty.Register(nameof(IsResizing), typeof(bool), typeof(SimpleHost), new PropertyMetadata(false));
-
     public bool IsPanMoving
     {
         get { return (bool)GetValue(IsPanMovingProperty); }
@@ -527,7 +519,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         // TBR: Option not to clip rect or stop at first/second parent?
         // For performance should focus only on ScrollViewer if any and Owner Window (other sources that clip our host?)
 
-        if (!IsVisible || IsResizing)
+        if (!IsVisible)
             return;
 
         try
@@ -671,17 +663,8 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
 
         _mouseLeftDownPoint = e.GetPosition(window);
 
-        // Resize
-        if (ResizingSide != 0)
-        {
-            IsResizing = true;
-
-            _ownerZeroPointPos = Owner.PointToScreen(_zeroPoint);
-            GetWindowRect(SurfaceHandle, ref _beforeResizeRect);
-            ResetVisibleRect();
-        }
         // PanMove
-        else if (Player != null &&
+        if (Player != null &&
             (PanMoveOnCtrl == availWindow || PanMoveOnCtrl == AvailableWindows.Both) &&
             (Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl)))
         {
@@ -701,25 +684,12 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
     private void Overlay_LostMouseCapture(object sender, MouseEventArgs e) => Overlay_ReleaseCapture();
     private void Surface_ReleaseCapture()
     {
-        if (!IsResizing && !IsPanMoving && !IsDragMoving)
+        if (!IsPanMoving && !IsDragMoving)
             return;
 
         Surface.ReleaseMouseCapture();
 
-        if (IsResizing)
-        {
-            ResizingSide = 0;
-            Surface.Cursor = Cursors.Arrow;
-            IsResizing = false;
-
-            GetWindowRect(SurfaceHandle, ref _curRect);
-            MarginTarget.Margin = new(MarginTarget.Margin.Left + (_curRect.Left - _beforeResizeRect.Left) / DpiX, MarginTarget.Margin.Top + (_curRect.Top - _beforeResizeRect.Top) / DpiY, MarginTarget.Margin.Right, MarginTarget.Margin.Bottom);
-            Width = Surface.Width;
-            Height = Surface.Height;
-            RecalcRect();
-            //Host_LayoutUpdated(null, null); // When attached to restore the clipped rect
-        }
-        else if (IsPanMoving)
+        if (IsPanMoving)
             IsPanMoving = false;
         else if (IsDragMoving)
             IsDragMoving = false;
@@ -728,25 +698,12 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
     }
     private void Overlay_ReleaseCapture()
     {
-        if (!IsResizing && !IsPanMoving && !IsDragMoving)
+        if (!IsPanMoving && !IsDragMoving)
             return;
 
         _overlay.ReleaseMouseCapture();
 
-        if (IsResizing)
-        {
-            ResizingSide = 0;
-            _overlay.Cursor = Cursors.Arrow;
-            IsResizing = false;
-
-            GetWindowRect(SurfaceHandle, ref _curRect);
-            MarginTarget.Margin = new(MarginTarget.Margin.Left + (_curRect.Left - _beforeResizeRect.Left) / DpiX, MarginTarget.Margin.Top + (_curRect.Top - _beforeResizeRect.Top) / DpiY, MarginTarget.Margin.Right, MarginTarget.Margin.Bottom);
-            Width = Surface.Width;
-            Height = Surface.Height;
-            RecalcRect();
-            //Host_LayoutUpdated(null, null); // When attached to restore the clipped rect
-        }
-        else if (IsPanMoving)
+        if (IsPanMoving)
             IsPanMoving = false;
         else if (IsDragMoving)
             IsDragMoving = false;
@@ -792,12 +749,8 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
             return;
         }
 
-        // Resize (MouseDown + ResizeSide != 0)
-        if (IsResizing)
-            Resize(cur, ResizingSide, _curResizeRatioIfEnabled);
-
         // Drag Move Self (Attached|Detached)
-        else if (IsDragMoving)
+        if (IsDragMoving)
         {
             MarginTarget.Margin = new(
                     MarginTarget.Margin.Left + cur.X - _mouseLeftDownPoint.X,
@@ -884,97 +837,6 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
             ShowWindow(OverlayHandle, (int)ShowWindowCommands.SW_SHOWMINIMIZED);
             ShowWindow(OverlayHandle, (int)ShowWindowCommands.SW_SHOWMAXIMIZED);
         }
-    }
-
-    public void Resize(Point p, int resizingSide, double ratio = 0.0)
-    {
-        double windowWidth = Surface.ActualWidth;
-        double windowHeight = Surface.ActualHeight;
-        double windowLeft;
-        double windowTop;
-
-        GetWindowRect(SurfaceHandle, ref _curRect);
-        windowLeft = (_curRect.Left - _ownerZeroPointPos.X) / DpiX;
-        windowTop = (_curRect.Top - _ownerZeroPointPos.Y) / DpiY;
-
-        if (resizingSide == 2 || resizingSide == 3 || resizingSide == 6)
-        {
-            p.X += 5;
-
-            windowWidth = p.X > Surface.MinWidth ?
-                p.X < Surface.MaxWidth ? p.X : Surface.MaxWidth :
-                Surface.MinWidth;
-        }
-        else if (resizingSide == 1 || resizingSide == 4 || resizingSide == 5)
-        {
-            p.X -= 5;
-            double temp = Surface.ActualWidth - p.X;
-            if (temp > Surface.MinWidth && temp < Surface.MaxWidth)
-            {
-                windowWidth = temp;
-                windowLeft = windowLeft + p.X;
-            }
-        }
-
-        if (resizingSide == 2 || resizingSide == 4 || resizingSide == 8)
-        {
-            p.Y += 5;
-
-            if (p.Y > Surface.MinHeight)
-            {
-                windowHeight = p.Y < Surface.MaxHeight ? p.Y : Surface.MaxHeight;
-            }
-            else
-                return;
-        }
-        else if (resizingSide == 1 || resizingSide == 3 || resizingSide == 7)
-        {
-            if (ratio != 0 && resizingSide != 7)
-            {
-                double temp = windowWidth / ratio;
-                if (temp > Surface.MinHeight && temp < Surface.MaxHeight)
-                    windowTop += Surface.ActualHeight - temp;
-                else
-                    return;
-            }
-            else
-            {
-                p.Y -= 5;
-                double temp = Surface.ActualHeight - p.Y;
-                if (temp > Surface.MinHeight && temp < Surface.MaxHeight)
-                {
-                    windowHeight = temp;
-                    windowTop += p.Y;
-                }
-                else
-                    return;
-            }
-        }
-
-        if (ratio != 0)
-        {
-            if (resizingSide == 7 || resizingSide == 8)
-                windowWidth = windowHeight * ratio;
-            else
-                windowHeight = windowWidth / ratio;
-        }
-
-        if (windowWidth >= windowHeight)
-            PreferredLandscapeWidth = (int)windowWidth;
-        else
-            PreferredPortraitHeight = (int)windowHeight;
-
-        windowLeft *= DpiX;
-        windowTop *= DpiY;
-        windowWidth *= DpiX;
-        windowHeight *= DpiY;
-
-        SetWindowPos(SurfaceHandle, nint.Zero,
-            (int)windowLeft,
-            (int)windowTop,
-            (int)Math.Ceiling(windowWidth),
-            (int)Math.Ceiling(windowHeight),
-            (uint)(SetWindowPosFlags.SWP_NOZORDER | SetWindowPosFlags.SWP_NOACTIVATE));
     }
     #endregion
 
