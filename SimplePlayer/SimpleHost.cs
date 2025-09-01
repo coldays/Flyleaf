@@ -262,78 +262,8 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
     }
     private void UpdateCurRatio()
     {
-        if (!KeepRatioOnResize)
+        if (!false)
             return;
-
-        if (Player != null && Player.Video.AspectRatio.Value > 0)
-            _curResizeRatio = Player.Video.AspectRatio.Value;
-        else if (ReplicaPlayer != null && ReplicaPlayer.Video.AspectRatio.Value > 0)
-            _curResizeRatio = ReplicaPlayer.Video.AspectRatio.Value;
-        else
-            _curResizeRatio = (float)(16.0 / 9.0);
-
-        _curResizeRatioIfEnabled = _curResizeRatio;
-
-        Rect screen;
-
-        if (Owner == null)
-        {
-            Height = ActualWidth / _curResizeRatio;
-            return;
-        }
-
-        screen = new(_zeroPoint, Owner.RenderSize);
-
-        double windowWidth;
-        double windowHeight;
-
-        if (_curResizeRatio >= 1)
-        {
-            windowHeight = PreferredLandscapeWidth / _curResizeRatio;
-
-            if (windowHeight < Surface.MinHeight)
-            {
-                windowHeight = Surface.MinHeight;
-                windowWidth = windowHeight * _curResizeRatio;
-            }
-            else if (windowHeight > Surface.MaxHeight)
-            {
-                windowHeight = Surface.MaxHeight;
-                windowWidth = Surface.Height * _curResizeRatio;
-            }
-            else if (windowHeight > screen.Height)
-            {
-                windowHeight = screen.Height;
-                windowWidth = windowHeight * _curResizeRatio;
-            }
-            else
-                windowWidth = PreferredLandscapeWidth;
-        }
-        else
-        {
-            windowWidth = PreferredPortraitHeight * _curResizeRatio;
-
-            if (windowWidth < Surface.MinWidth)
-            {
-                windowWidth = Surface.MinWidth;
-                windowHeight = windowWidth / _curResizeRatio;
-            }
-            else if (windowWidth > Surface.MaxWidth)
-            {
-                windowWidth = Surface.MaxWidth;
-                windowHeight = windowWidth / _curResizeRatio;
-            }
-            else if (windowWidth > screen.Width)
-            {
-                windowWidth = screen.Width;
-                windowHeight = windowWidth / _curResizeRatio;
-            }
-            else
-                windowHeight = PreferredPortraitHeight;
-        }
-
-        Height = windowHeight;
-        Width = windowWidth;
     }
     private static void OnKeepRatioOnResizeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
@@ -344,10 +274,8 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         if (host.Disposed)
             return;
 
-        if (!host.KeepRatioOnResize)
+        if (!false)
             host._curResizeRatioIfEnabled = 0;
-        else
-            host.UpdateCurRatio();
     }
     private static void OnPlayerChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
@@ -647,16 +575,6 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
             //if (ex.Message == "The specified Visual is not an ancestor of this Visual.")
             //Host_Loaded(null, null);
         }
-    }
-    private void Player_Video_PropertyChanged(object sender, PropertyChangedEventArgs e)
-    {
-        if (KeepRatioOnResize && e.PropertyName == nameof(Player.Video.AspectRatio) && Player.Video.AspectRatio.Value > 0)
-            UpdateCurRatio();
-    }
-    private void ReplicaPlayer_Video_PropertyChanged(object sender, PropertyChangedEventArgs e)
-    {
-        if (KeepRatioOnResize && e.PropertyName == nameof(ReplicaPlayer.Video.AspectRatio) && ReplicaPlayer.Video.AspectRatio.Value > 0)
-            UpdateCurRatio();
     }
     #endregion
 
@@ -1086,7 +1004,6 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         if (oldPlayer != null)
         {
             oldPlayer.renderer.SetChildHandle(nint.Zero);
-            oldPlayer.Video.PropertyChanged -= ReplicaPlayer_Video_PropertyChanged;
         }
 
         if (ReplicaPlayer == null)
@@ -1094,8 +1011,6 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
 
         if (Surface != null)
             ReplicaPlayer.renderer.SetChildHandle(SurfaceHandle);
-
-        ReplicaPlayer.Video.PropertyChanged += ReplicaPlayer_Video_PropertyChanged;
     }
     public virtual void SetPlayer(Player oldPlayer)
     {
@@ -1104,7 +1019,6 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         {
             Log.Debug($"De-assign Player #{oldPlayer.PlayerId}");
 
-            oldPlayer.Video.PropertyChanged -= Player_Video_PropertyChanged;
             oldPlayer.VideoDecoder.DestroySwapChain();
             oldPlayer.Host = null;
         }
@@ -1138,7 +1052,6 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
             Player.VideoDecoder.CreateSwapChain(SurfaceHandle);
         }
 
-        Player.Video.PropertyChanged += Player_Video_PropertyChanged;
         UpdateCurRatio();
     }
     public virtual void SetSurface(bool fromSetOverlay = false)
