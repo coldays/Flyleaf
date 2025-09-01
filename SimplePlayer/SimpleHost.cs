@@ -30,7 +30,6 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
     public nint SurfaceHandle { get; private set; }
     public nint OverlayHandle { get; private set; }
     public nint OwnerHandle { get; private set; }
-    public int ResizingSide { get; private set; }
 
     public int UniqueId { get; private set; }
     public bool Disposed { get; private set; }
@@ -700,8 +699,8 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         }
     }
 
-    private void Surface_MouseLeave(object sender, MouseEventArgs e) { ResizingSide = 0; Surface.Cursor = Cursors.Arrow; }
-    private void Overlay_MouseLeave(object sender, MouseEventArgs e) { ResizingSide = 0; _overlay.Cursor = Cursors.Arrow; }
+    private void Surface_MouseLeave(object sender, MouseEventArgs e) { Surface.Cursor = Cursors.Arrow; }
+    private void Overlay_MouseLeave(object sender, MouseEventArgs e) { _overlay.Cursor = Cursors.Arrow; }
 
     private void Surface_MouseWheel(object sender, MouseWheelEventArgs e)
     {
