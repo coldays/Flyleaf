@@ -159,14 +159,6 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
     public static readonly DependencyProperty IsPanMovingProperty =
         DependencyProperty.Register(nameof(IsPanMoving), typeof(bool), typeof(SimpleHost), new PropertyMetadata(false));
 
-    public FrameworkElement MarginTarget
-    {
-        get => (FrameworkElement)GetValue(MarginTargetProperty);
-        set => SetValue(MarginTargetProperty, value);
-    }
-    public static readonly DependencyProperty MarginTargetProperty =
-        DependencyProperty.Register(nameof(MarginTarget), typeof(FrameworkElement), typeof(SimpleHost), new PropertyMetadata(null));
-
     public Player Player
     {
         get => (Player)GetValue(PlayerProperty);
@@ -801,7 +793,6 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         if (isDesginMode)
             return;
 
-        MarginTarget = this;
         Log = new LogHandler(("[#" + UniqueId + "]").PadRight(8, ' ') + $" [TPGFlyleafHost NP] ");
         Loaded += Host_Loaded;
     }
