@@ -12,10 +12,8 @@ using static FlyleafLib.Utils;
 using static FlyleafLib.Utils.NativeMethods;
 using Brushes = System.Windows.Media.Brushes;
 using Cursors = System.Windows.Input.Cursors;
-using DataFormats = System.Windows.DataFormats;
 using DragDropEffects = System.Windows.DragDropEffects;
 using DragEventArgs = System.Windows.DragEventArgs;
-using DragEventHandler = System.Windows.DragEventHandler;
 using KeyEventArgs = System.Windows.Input.KeyEventArgs;
 using MouseEventArgs = System.Windows.Input.MouseEventArgs;
 using Point = System.Windows.Point;
@@ -40,8 +38,6 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
 
     public event EventHandler SurfaceCreated;
     public event EventHandler OverlayCreated;
-    public event DragEventHandler OnSurfaceDrop;
-    public event DragEventHandler OnOverlayDrop;
 
     static bool isDesginMode;
     static int idGenerator = 1;
@@ -102,22 +98,6 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
     public static readonly DependencyProperty PanZoomOnCtrlWheelProperty =
         DependencyProperty.Register(nameof(PanZoomOnCtrlWheel), typeof(AvailableWindows), typeof(SimpleHost), new PropertyMetadata(AvailableWindows.Surface));
 
-    public AvailableWindows KeyBindings
-    {
-        get => (AvailableWindows)GetValue(KeyBindingsProperty);
-        set => SetValue(KeyBindingsProperty, value);
-    }
-    public static readonly DependencyProperty KeyBindingsProperty =
-        DependencyProperty.Register(nameof(KeyBindings), typeof(AvailableWindows), typeof(SimpleHost), new PropertyMetadata(AvailableWindows.Surface));
-
-    public AvailableWindows MouseBindings
-    {
-        get => (AvailableWindows)GetValue(MouseBindingsProperty);
-        set => SetValue(MouseBindingsProperty, value);
-    }
-    public static readonly DependencyProperty MouseBindingsProperty =
-        DependencyProperty.Register(nameof(MouseBindings), typeof(AvailableWindows), typeof(SimpleHost), new PropertyMetadata(AvailableWindows.Both, new PropertyChangedCallback(OnMouseBindings)));
-
     public int ActivityTimeout
     {
         get => (int)GetValue(ActivityTimeoutProperty);
@@ -168,19 +148,6 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
     #endregion
 
     #region Events
-    private static void OnMouseBindings(DependencyObject d, DependencyPropertyChangedEventArgs e)
-    {
-        if (isDesginMode)
-            return;
-
-        SimpleHost host = d as SimpleHost;
-        if (host.Disposed)
-            return;
-
-        host.SetMouseSurface();
-        host.SetMouseOverlay();
-    }
-
     private static void OnPlayerChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         if (isDesginMode)
@@ -483,12 +450,16 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
     #endregion
 
     #region Events Surface / Overlay
-    private void Surface_KeyDown(object sender, KeyEventArgs e) { if (KeyBindings == AvailableWindows.Surface || KeyBindings == AvailableWindows.Both) e.Handled = Player.KeyDown(Player, e); }
-    private void Overlay_KeyDown(object sender, KeyEventArgs e) { if (KeyBindings == AvailableWindows.Overlay || KeyBindings == AvailableWindows.Both) e.Handled = Player.KeyDown(Player, e); }
+    public new event EventHandler<KeyEventArgs> KeyDown;
+    public new event EventHandler<KeyEventArgs> KeyUp;
 
-    private void Surface_KeyUp(object sender, KeyEventArgs e) { if (KeyBindings == AvailableWindows.Surface || KeyBindings == AvailableWindows.Both) e.Handled = Player.KeyUp(Player, e); }
-    private void Overlay_KeyUp(object sender, KeyEventArgs e) { if (KeyBindings == AvailableWindows.Overlay || KeyBindings == AvailableWindows.Both) e.Handled = Player.KeyUp(Player, e); }
+    private void Surface_KeyDown(object sender, KeyEventArgs e) { KeyDown?.Invoke(this, e); }
+    private void Overlay_KeyDown(object sender, KeyEventArgs e) { KeyDown?.Invoke(this, e); }
 
+    private void Surface_KeyUp(object sender, KeyEventArgs e) { KeyUp?.Invoke(this, e); }
+    private void Overlay_KeyUp(object sender, KeyEventArgs e) { KeyUp?.Invoke(this, e); }
+
+    public new event EventHandler<DragEventArgs> Drop;
     private void Surface_Drop(object sender, DragEventArgs e)
     {
         Surface.ReleaseMouseCapture();
@@ -497,25 +468,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
             return;
 
         // Invoke event first and see if it gets handled
-        OnSurfaceDrop?.Invoke(this, e);
-
-        if (!e.Handled)
-        {
-            // Player Open File
-            if (e.Data.GetDataPresent(DataFormats.FileDrop))
-            {
-                string filename = ((string[])e.Data.GetData(DataFormats.FileDrop, false))[0];
-                Player.OpenAsync(filename);
-            }
-
-            // Player Open Text
-            else if (e.Data.GetDataPresent(DataFormats.Text))
-            {
-                string text = e.Data.GetData(DataFormats.Text, false).ToString();
-                if (text.Length > 0)
-                    Player.OpenAsync(text);
-            }
-        }
+        Drop?.Invoke(this, e);
 
         Surface.Activate();
     }
@@ -527,25 +480,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
             return;
 
         // Invoke event first and see if it gets handled
-        OnOverlayDrop?.Invoke(this, e);
-
-        if (!e.Handled)
-        {
-            // Player Open File
-            if (e.Data.GetDataPresent(DataFormats.FileDrop))
-            {
-                string filename = ((string[])e.Data.GetData(DataFormats.FileDrop, false))[0];
-                Player.OpenAsync(filename);
-            }
-
-            // Player Open Text
-            else if (e.Data.GetDataPresent(DataFormats.Text))
-            {
-                string text = e.Data.GetData(DataFormats.Text, false).ToString();
-                if (text.Length > 0)
-                    Player.OpenAsync(text);
-            }
-        }
+        Drop?.Invoke(this, e);
 
         _overlay.Activate();
     }
@@ -920,7 +855,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         if (Surface == null)
             return;
 
-        if ((MouseBindings == AvailableWindows.Surface || MouseBindings == AvailableWindows.Both) && !_isMouseBindingsSubscribedSurface)
+        if (!_isMouseBindingsSubscribedSurface)
         {
             Surface.LostMouseCapture += Surface_LostMouseCapture;
             Surface.MouseLeftButtonDown += Surface_MouseLeftButtonDown;
@@ -946,7 +881,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         if (_overlay == null)
             return;
 
-        if ((MouseBindings == AvailableWindows.Overlay || MouseBindings == AvailableWindows.Both) && !_isMouseBindingsSubscribedOverlay)
+        if (!_isMouseBindingsSubscribedOverlay)
         {
             _overlay.LostMouseCapture += Overlay_LostMouseCapture;
             _overlay.MouseLeftButtonDown += Overlay_MouseLeftButtonDown;
