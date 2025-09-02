@@ -78,14 +78,6 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
     public static readonly DependencyProperty BringToFrontOnClickProperty =
     DependencyProperty.Register(nameof(BringToFrontOnClick), typeof(bool), typeof(SimpleHost), new PropertyMetadata(true));
 
-    public AvailableWindows OpenOnDrop
-    {
-        get => (AvailableWindows)GetValue(OpenOnDropProperty);
-        set => SetValue(OpenOnDropProperty, value);
-    }
-    public static readonly DependencyProperty OpenOnDropProperty =
-        DependencyProperty.Register(nameof(OpenOnDrop), typeof(AvailableWindows), typeof(SimpleHost), new PropertyMetadata(AvailableWindows.Surface, new PropertyChangedCallback(DropChanged)));
-
     public AvailableWindows PanMoveOnCtrl
     {
         get => (AvailableWindows)GetValue(PanMoveOnCtrlProperty);
@@ -188,24 +180,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         host.SetMouseSurface();
         host.SetMouseOverlay();
     }
-    private static void DropChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-    {
-        SimpleHost host = d as SimpleHost;
-        if (host.Disposed)
-            return;
 
-        if (host.Surface == null)
-            return;
-
-        host.Surface.AllowDrop =
-            host.OpenOnDrop == AvailableWindows.Surface || host.OpenOnDrop == AvailableWindows.Both;
-
-        if (host._overlay == null)
-            return;
-
-        host._overlay.AllowDrop =
-            host.OpenOnDrop == AvailableWindows.Overlay || host.OpenOnDrop == AvailableWindows.Both;
-    }
     private static void OnPlayerChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         if (isDesginMode)
@@ -881,8 +856,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
 
         SetMouseSurface();
 
-        Surface.AllowDrop =
-            OpenOnDrop == AvailableWindows.Surface || OpenOnDrop == AvailableWindows.Both;
+        Surface.AllowDrop = true;
 
         if (IsLoaded && Owner == null && !fromSetOverlay)
             Host_Loaded(null, null);
@@ -924,8 +898,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         // Owner will close the overlay
         _overlay.KeyDown += (o, e) => { if (e.Key == Key.System && e.SystemKey == Key.F4) Surface?.Focus(); };
 
-        _overlay.AllowDrop =
-            OpenOnDrop == AvailableWindows.Overlay || OpenOnDrop == AvailableWindows.Both;
+        _overlay.AllowDrop = true;
 
         _overlay.Template = OverlayTemplate;
 
