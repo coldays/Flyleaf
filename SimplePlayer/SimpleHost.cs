@@ -450,16 +450,16 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
     #endregion
 
     #region Events Surface / Overlay
-    public new event EventHandler<KeyEventArgs> KeyDown;
-    public new event EventHandler<KeyEventArgs> KeyUp;
+    public event EventHandler<KeyEventArgs> KeyPressDown;
+    public event EventHandler<KeyEventArgs> KeyPressUp;
 
-    private void Surface_KeyDown(object sender, KeyEventArgs e) { KeyDown?.Invoke(this, e); }
-    private void Overlay_KeyDown(object sender, KeyEventArgs e) { KeyDown?.Invoke(this, e); }
+    private void Surface_KeyDown(object sender, KeyEventArgs e) { KeyPressDown?.Invoke(this, e); }
+    private void Overlay_KeyDown(object sender, KeyEventArgs e) { KeyPressDown?.Invoke(this, e); }
 
-    private void Surface_KeyUp(object sender, KeyEventArgs e) { KeyUp?.Invoke(this, e); }
-    private void Overlay_KeyUp(object sender, KeyEventArgs e) { KeyUp?.Invoke(this, e); }
+    private void Surface_KeyUp(object sender, KeyEventArgs e) { KeyPressUp?.Invoke(this, e); }
+    private void Overlay_KeyUp(object sender, KeyEventArgs e) { KeyPressUp?.Invoke(this, e); }
 
-    public new event EventHandler<DragEventArgs> Drop;
+    public event EventHandler<DragEventArgs> Dropped;
     private void Surface_Drop(object sender, DragEventArgs e)
     {
         Surface.ReleaseMouseCapture();
@@ -468,7 +468,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
             return;
 
         // Invoke event first and see if it gets handled
-        Drop?.Invoke(this, e);
+        Dropped?.Invoke(this, e);
 
         Surface.Activate();
     }
@@ -480,7 +480,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
             return;
 
         // Invoke event first and see if it gets handled
-        Drop?.Invoke(this, e);
+        Dropped?.Invoke(this, e);
 
         _overlay.Activate();
     }
