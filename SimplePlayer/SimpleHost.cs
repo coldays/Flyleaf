@@ -470,6 +470,13 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         window.Focus();
         Player?.Activity.RefreshFullActive();
 
+        if (Player is null)
+            return;
+
+        // Do not allow panning when not zoomed in
+        if (Player.renderer.Zoom == 1.0)
+            return;
+
         _mouseLeftDownPoint = e.GetPosition(window);
 
         // PanMove
