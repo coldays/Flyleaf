@@ -944,6 +944,17 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
             SetWindowRgn(OverlayHandle, CreateRectRgn((int)Math.Round(rect.X * DpiX), (int)Math.Round(rect.Y * DpiY), (int)Math.Round(rect.Right * DpiX), (int)Math.Round(rect.Bottom * DpiY)), true);
     }
 
+    public Point? GetVideoFramePoint()
+    {
+        if (Surface is null || Player is null)
+            return null;
+
+        Point mousePos = Mouse.GetPosition(Surface);
+        var viewport = Player.renderer.GetViewport;
+
+        return new Point((mousePos.X - viewport.X) / viewport.Width, (mousePos.Y - viewport.Y) / viewport.Height);
+    }
+
     /// <summary>
     /// Disposes the Surface and Overlay Windows and de-assigns the Player
     /// </summary>
