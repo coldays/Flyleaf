@@ -74,30 +74,6 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
     public static readonly DependencyProperty BringToFrontOnClickProperty =
     DependencyProperty.Register(nameof(BringToFrontOnClick), typeof(bool), typeof(SimpleHost), new PropertyMetadata(true));
 
-    public AvailableWindows PanMoveOnCtrl
-    {
-        get => (AvailableWindows)GetValue(PanMoveOnCtrlProperty);
-        set => SetValue(PanMoveOnCtrlProperty, value);
-    }
-    public static readonly DependencyProperty PanMoveOnCtrlProperty =
-        DependencyProperty.Register(nameof(PanMoveOnCtrl), typeof(AvailableWindows), typeof(SimpleHost), new PropertyMetadata(AvailableWindows.Surface));
-
-    public AvailableWindows PanRotateOnShiftWheel
-    {
-        get => (AvailableWindows)GetValue(PanRotateOnShiftWheelProperty);
-        set => SetValue(PanRotateOnShiftWheelProperty, value);
-    }
-    public static readonly DependencyProperty PanRotateOnShiftWheelProperty =
-        DependencyProperty.Register(nameof(PanRotateOnShiftWheel), typeof(AvailableWindows), typeof(SimpleHost), new PropertyMetadata(AvailableWindows.Surface));
-
-    public AvailableWindows PanZoomOnCtrlWheel
-    {
-        get => (AvailableWindows)GetValue(PanZoomOnCtrlWheelProperty);
-        set => SetValue(PanZoomOnCtrlWheelProperty, value);
-    }
-    public static readonly DependencyProperty PanZoomOnCtrlWheelProperty =
-        DependencyProperty.Register(nameof(PanZoomOnCtrlWheel), typeof(AvailableWindows), typeof(SimpleHost), new PropertyMetadata(AvailableWindows.Surface));
-
     public int ActivityTimeout
     {
         get => (int)GetValue(ActivityTimeoutProperty);
@@ -488,17 +464,6 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
     private void Overlay_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) => SO_MouseLeftButtonDown(e, _overlay);
     private void SO_MouseLeftButtonDown(MouseButtonEventArgs e, Window window)
     {
-        AvailableWindows availWindow;
-
-        if (window == Surface)
-        {
-            availWindow = AvailableWindows.Surface;
-        }
-        else
-        {
-            availWindow = AvailableWindows.Overlay;
-        }
-
         if (BringToFrontOnClick) // Activate and Z-order top
             BringToFront();
 
@@ -508,9 +473,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         _mouseLeftDownPoint = e.GetPosition(window);
 
         // PanMove
-        if (Player != null &&
-            (PanMoveOnCtrl == availWindow || PanMoveOnCtrl == AvailableWindows.Both) &&
-            (Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl)))
+        if (Player != null)
         {
             _panPrevX = Player.PanXOffset;
             _panPrevY = Player.PanYOffset;
@@ -598,48 +561,24 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         if (Player == null || e.Delta == 0)
             return;
 
-        if ((Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl)) &&
-            (PanZoomOnCtrlWheel == AvailableWindows.Surface || PanZoomOnCtrlWheel == AvailableWindows.Both))
-        {
-            var cur = e.GetPosition(Surface);
-            Point curDpi = new(cur.X * DpiX, cur.Y * DpiY);
-            if (e.Delta > 0)
-                Player.ZoomIn(curDpi);
-            else
-                Player.ZoomOut(curDpi);
-        }
-        else if ((Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift)) &&
-            (PanRotateOnShiftWheel == AvailableWindows.Surface || PanZoomOnCtrlWheel == AvailableWindows.Both))
-        {
-            if (e.Delta > 0)
-                Player.RotateRight();
-            else
-                Player.RotateLeft();
-        }
+        var cur = e.GetPosition(Surface);
+        Point curDpi = new(cur.X * DpiX, cur.Y * DpiY);
+        if (e.Delta > 0)
+            Player.ZoomIn(curDpi);
+        else
+            Player.ZoomOut(curDpi);
     }
     private void Overlay_MouseWheel(object sender, MouseWheelEventArgs e)
     {
         if (Player == null || e.Delta == 0)
             return;
 
-        if ((Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl)) &&
-            (PanZoomOnCtrlWheel == AvailableWindows.Overlay || PanZoomOnCtrlWheel == AvailableWindows.Both))
-        {
-            var cur = e.GetPosition(_overlay);
-            Point curDpi = new(cur.X * DpiX, cur.Y * DpiY);
-            if (e.Delta > 0)
-                Player.ZoomIn(curDpi);
-            else
-                Player.ZoomOut(curDpi);
-        }
-        else if ((Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift)) &&
-            (PanRotateOnShiftWheel == AvailableWindows.Overlay || PanZoomOnCtrlWheel == AvailableWindows.Both))
-        {
-            if (e.Delta > 0)
-                Player.RotateRight();
-            else
-                Player.RotateLeft();
-        }
+        var cur = e.GetPosition(_overlay);
+        Point curDpi = new(cur.X * DpiX, cur.Y * DpiY);
+        if (e.Delta > 0)
+            Player.ZoomIn(curDpi);
+        else
+            Player.ZoomOut(curDpi);
     }
 
     private void Surface_Closed(object sender, EventArgs e)
