@@ -479,15 +479,9 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
 
         _mouseLeftDownPoint = e.GetPosition(window);
 
-        // PanMove
-        if (Player != null)
-        {
-            _panPrevX = Player.PanXOffset;
-            _panPrevY = Player.PanYOffset;
-            IsPanMoving = true;
-        }
-        else
-            return; // No Capture
+        _panPrevX = Player.PanXOffset;
+        _panPrevY = Player.PanYOffset;
+        IsPanMoving = true;
 
         window.CaptureMouse();
     }
