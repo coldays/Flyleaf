@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.ObjectModel;
-
-using FlyleafLib.MediaFramework.MediaContext;
+﻿using FlyleafLib.MediaFramework.MediaContext;
 using FlyleafLib.MediaFramework.MediaStream;
 
 namespace FlyleafLib.MediaPlayer;
@@ -13,6 +10,9 @@ public class Subtitles : NotifyPropertyChanged
     /// </summary>
     public ObservableCollection<SubtitlesStream>
                     Streams         => decoder?.VideoDemuxer.SubtitlesStreams;
+
+    public int      StreamIndex     { get => streamIndex;       internal set => Set(ref _StreamIndex, value); }
+    int _StreamIndex, streamIndex = -1;
 
     /// <summary>
     /// Whether the input has subtitles and it is configured
@@ -42,6 +42,7 @@ public class Subtitles : NotifyPropertyChanged
 
         uiAction = () =>
         {
+            StreamIndex = streamIndex;
             IsOpened    = IsOpened;
             Codec       = Codec;
             SubsText    = SubsText;
@@ -49,6 +50,7 @@ public class Subtitles : NotifyPropertyChanged
     }
     internal void Reset()
     {
+        streamIndex = -1;
         codec       = null;
         isOpened    = false;
         subsText    = "";
@@ -61,6 +63,7 @@ public class Subtitles : NotifyPropertyChanged
     {
         if (decoder.SubtitlesStream == null) { Reset(); return; }
 
+        streamIndex = decoder.SubtitlesStream.StreamIndex;
         codec       = decoder.SubtitlesStream.Codec;
         isOpened    =!decoder.SubtitlesDecoder.Disposed;
         subsText    = "";

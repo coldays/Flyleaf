@@ -1,4 +1,20 @@
-﻿namespace FlyleafLib.MediaFramework.MediaRenderer;
+﻿/*
+LinearToSRGB | SRGBToLinear:
+    Simplified version (slightly better performance and on dark colors, but not accurate enough) | possible expose to config
+    c = pow(c, 1.0 / 2.2); | c = pow(c, 2.2);
+
+HABLE_DEFAULT
+    TBR: whitepoint, if should be 4.8 and possible expose to config
+
+Chroma Location / Sampling
+    Small improvement but not performance penalty
+
+Up/Down Scaling
+    High performance penalty and difficult implementation for good quality
+    Use D3D11VA proprietary and add shader support
+*/
+
+namespace FlyleafLib.MediaFramework.MediaRenderer;
 
 internal static partial class ShaderCompiler
 {
@@ -13,24 +29,21 @@ Texture2D		Texture4		: register(t3);
 struct ConfigData
 {
     int coefsIndex;
+
     float brightness;
     float contrast;
     float hue;
     float saturation;
+
     float uvOffset;
-    float yoffset;
     int tonemap;
     float hdrtone;
-    int fieldType;
-
-    float2 padding;
 };
 
 cbuffer         Config          : register(b0)
 {
     ConfigData Config;
 };
-
 
 SamplerState Sampler : IMMUTABLE
 {
@@ -41,6 +54,24 @@ SamplerState Sampler : IMMUTABLE
     ComparisonFunc  = NEVER;
     MinLOD          = 0;
 };
+
+inline float3 LinearToSRGB(float3 c)
+{
+    float3 srgbLo = c * 12.92;
+    float3 srgbHi = 1.055 * pow(c, 1.0 / 2.4) - 0.055;
+    float3 threshold = step(0.0031308, c);
+
+    return lerp(srgbLo, srgbHi, threshold);
+}
+
+inline float3 SRGBToLinear(float3 c)
+{
+    float3 linearLo = c / 12.92;
+    float3 linearHi = pow((c + 0.055) / 1.055, 2.4);
+    float3 threshold = step(0.04045, c);
+    
+    return lerp(linearLo, linearHi, threshold);
+}
 
 inline float3 Gamut2020To709(float3 c)
 {
@@ -107,10 +138,13 @@ static const float3x3 coefs[3] =
 
 inline float3 YUVToRGBFull(float3 yuv)
 {
-    yuv.x   = (yuv.x - 0.0625) * 1.16438356;
     yuv.yz -= 0.5;
     return mul(coefs[Config.coefsIndex], yuv);
 }
+#else
+// TODO: RGBLimitedToFull + Linears (transfer from .cs)
+static const float rgbOffset = 16.0 / 255.0;
+static const float rgbScale = 255.0 / 219.0;
 #endif
 
 #if defined(dPQToLinear) || defined(dHLGToLinear)
@@ -176,7 +210,7 @@ inline float3 ToneAces(float3 x)
     const float c = 2.43;
     const float d = 0.59;
     const float e = 0.14;
-    return saturate((x * (a * x + b)) / (x * (c * x + d) + e));
+    return (x * (a * x + b)) / (x * (c * x + d) + e);
 }
 
 inline float3 ToneHable(float3 x)
@@ -198,11 +232,11 @@ inline float3 ToneHable(float3 x)
 
     return ((x * (A * x + C * B) + D * E) / (x * (A * x + B) + D * F)) - E / F;
 }
-static const float3 HABLE48 = ToneHable(4.8);
+static const float3 HABLE_DEFAULT = ToneHable(11.2);
 
-inline float3 ToneReinhard(float3 x) //, float whitepoint=2.2) // or gamma?*
+inline float3 ToneReinhard(float3 x)
 {
-    return x * (1.0 + x / 4.84) / (x + 1.0); 
+    return x * (1.0 + x / 4.84) / (x + 1.0);
 }
 #endif
 
@@ -272,18 +306,6 @@ float4 main(PSInput input) : SV_TARGET
 
     float3 c = color.rgb;
 
-#if defined(dYUVLimited) || defined(dYUVFull)
-    #pragma warning( disable: 3556 )
-    [branch]
-    if (Config.fieldType != -1 && int(input.Position.y) % 2 != Config.fieldType)
-    {
-        float yAbove = Texture1.Sample(Sampler, float2(input.Texture.x, input.Texture.y - Config.yoffset)).r;
-        float yBelow = Texture1.Sample(Sampler, float2(input.Texture.x, input.Texture.y + Config.yoffset)).r;
-        c.r = (yAbove + yBelow) * 0.5f;
-    }
-    #pragma warning( enable: 3556 )
-#endif
-
 #if defined(dYUVLimited)
 	c = YUVToRGBLimited(c);
 #elif defined(dYUVFull)
@@ -291,10 +313,10 @@ float4 main(PSInput input) : SV_TARGET
 #endif
 
 #if defined(dBT2020)
-	c = pow(c, 2.2); // TODO: transferfunc gamma*
+    c = SRGBToLinear(c);    // TODO: transferfunc gamma*
 	c = Gamut2020To709(c);
 	c = saturate(c);
-	c = pow(c, 1.0 / 2.2);
+	c = LinearToSRGB(c);
 #else
 
 #if defined(dPQToLinear)
@@ -309,28 +331,31 @@ float4 main(PSInput input) : SV_TARGET
     [branch]
 	if (Config.tonemap == Hable)
 	{
-		c = ToneHable(c) / HABLE48;
+		c = ToneHable(c) / HABLE_DEFAULT;
+        c = saturate(c);
 		c = Gamut2020To709(c);
-		c = saturate(c);
-		c = pow(c, 1.0 / 2.2);
+        c = saturate(c);
+		c = LinearToSRGB(c);
 	}
 	else if (Config.tonemap == Reinhard)
 	{
 		c = ToneReinhard(c);
+        c = saturate(c);
 		c = Gamut2020To709(c);
-		c = saturate(c);
-		c = pow(c, 1.0 / 2.2);
+        c = saturate(c);
+		c = LinearToSRGB(c);
 	}
 	else if (Config.tonemap == Aces)
 	{
 		c = ToneAces(c);
+        c = saturate(c);
 		c = Gamut2020To709(c);
-		c = saturate(c);
+        c = saturate(c);
 		c = pow(c, 0.27);
 	}
     else
     {
-        c = pow(c, 1.0 / 2.2);
+        c = LinearToSRGB(c);
     }
 #endif
 
@@ -343,8 +368,8 @@ float4 main(PSInput input) : SV_TARGET
     c  = Hue(c, Config.hue);
     c  = Saturation(c, Config.saturation);
 #endif
-
-    return saturate(float4(c, 1.0));
+    
+    return saturate(float4(c, color.a));
 }
 "u8;
 }

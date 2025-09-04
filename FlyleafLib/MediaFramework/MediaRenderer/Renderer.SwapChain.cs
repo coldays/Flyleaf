@@ -5,20 +5,22 @@ using Vortice.Direct3D;
 using Vortice.Direct3D11;
 using Vortice.DirectComposition;
 using Vortice.DXGI;
+using Vortice.Mathematics;
 
 using static FlyleafLib.Utils.NativeMethods;
+
 using ID3D11Texture2D = Vortice.Direct3D11.ID3D11Texture2D;
 
 namespace FlyleafLib.MediaFramework.MediaRenderer;
 
 public partial class Renderer
 {
-    ID3D11Texture2D                         backBuffer;
-    ID3D11RenderTargetView                  backBufferRtv;
-    IDXGISwapChain1                         swapChain;
-    IDCompositionDevice                     dCompDevice;
-    IDCompositionVisual                     dCompVisual;
-    IDCompositionTarget                     dCompTarget;
+    ID3D11Texture2D         backBuffer;
+    ID3D11RenderTargetView  backBufferRtv;
+    IDXGISwapChain1         swapChain;
+    IDCompositionDevice     dCompDevice;
+    IDCompositionVisual     dCompVisual;
+    IDCompositionTarget     dCompTarget;
 
     const Int32         WM_NCDESTROY= 0x0082;
     const Int32         WM_SIZE     = 0x0005;
@@ -74,11 +76,11 @@ public partial class Renderer
             if (Disposed && parent == null)
                 Initialize(false);
 
-            ControlHandle = handle;
-            RECT rect       = new RECT();
+            ControlHandle   = handle;
+            RECT rect       = new();
             GetWindowRect(ControlHandle, ref rect);
-            ControlWidth = rect.Right - rect.Left;
-            ControlHeight = rect.Bottom - rect.Top;
+            ControlWidth    = rect.Right  - rect.Left;
+            ControlHeight   = rect.Bottom - rect.Top;
 
             try
             {
@@ -131,10 +133,10 @@ public partial class Renderer
             if (!isFlushing) // avoid calling UI thread during Player.Stop
             {
                 // SetWindowSubclass seems to require UI thread when RemoveWindowSubclass does not (docs are not mentioning this?)
-                if (System.Threading.Thread.CurrentThread.ManagedThreadId == System.Windows.Application.Current.Dispatcher.Thread.ManagedThreadId)
+                if (Thread.CurrentThread.ManagedThreadId == Application.Current.Dispatcher.Thread.ManagedThreadId)
                     SetWindowSubclass(ControlHandle, wndProcDelegatePtr, UIntPtr.Zero, UIntPtr.Zero);
                 else
-                    Utils.UI(() => SetWindowSubclass(ControlHandle, wndProcDelegatePtr, UIntPtr.Zero, UIntPtr.Zero));
+                    UI(() => SetWindowSubclass(ControlHandle, wndProcDelegatePtr, UIntPtr.Zero, UIntPtr.Zero));
             }
 
             Engine.Video.Factory.MakeWindowAssociation(ControlHandle, WindowAssociationFlags.IgnoreAll);
@@ -237,9 +239,7 @@ public partial class Renderer
         p.X -= (SideXPixels / 2 + PanXOffset);
         p.Y -= (SideYPixels / 2 + PanYOffset);
     }
-    public bool IsPointWithInViewPort(Point p)
-        => p.X >= GetViewport.X && p.X < GetViewport.X + GetViewport.Width && p.Y >= GetViewport.Y && p.Y < GetViewport.Y + GetViewport.Height;
-
+    
     public static double GetCenterPoint(double zoom, double offset)
         => zoom == 1 ? offset : offset / (zoom - 1); // possible bug when zoom = 1 (noticed in out of bounds zoom out)
 
@@ -263,48 +263,36 @@ public partial class Renderer
             * CP = VP / (ZP - 1) (when UP = ZP)
             */
 
-        if (!IsPointWithInViewPort(p))
+        Viewport view = GetViewport;
+
+        if (!(p.X >= view.X && p.X < view.X + view.Width && p.Y >= view.Y && p.Y < view.Y + view.Height)) // Point out of view
         {
             SetZoom(zoom);
             return;
         }
 
-        Point viewport = new Point(GetViewport.X, GetViewport.Y);
+        Point viewport = new(view.X, view.Y);
         RemoveViewportOffsets(ref viewport);
         RemoveViewportOffsets(ref p);
 
         // Finds the required center point so that p will have the same pixel after zoom
-        Point zoomCenter = new Point(
-        GetCenterPoint(zoom, ((p.X - viewport.X) / (this.zoom / zoom)) - p.X) / (GetViewport.Width / this.zoom),
-        GetCenterPoint(zoom, ((p.Y - viewport.Y) / (this.zoom / zoom)) - p.Y) / (GetViewport.Height / this.zoom));
+        Point zoomCenter = new(
+            GetCenterPoint(zoom, ((p.X - viewport.X) / (this.zoom / zoom)) - p.X) / (view.Width / this.zoom),
+            GetCenterPoint(zoom, ((p.Y - viewport.Y) / (this.zoom / zoom)) - p.Y) / (view.Height / this.zoom));
 
         SetZoomAndCenter(zoom, zoomCenter);
     }
 
     public void SetViewport(bool refresh = true)
     {
-        float ratio;
         int x, y, newWidth, newHeight, xZoomPixels, yZoomPixels;
 
-        if (Config.Video.AspectRatio == AspectRatio.Keep)
-            ratio = curRatio;
-        else
-            ratio = Config.Video.AspectRatio == AspectRatio.Fill
-            ? ControlWidth / (float)ControlHeight
-            : Config.Video.AspectRatio == AspectRatio.Custom ? Config.Video.CustomAspectRatio.Value : Config.Video.AspectRatio.Value;
-
-        if (ratio <= 0)
-            ratio = 1;
-
-        if (actualRotation == 90 || actualRotation == 270)
-            ratio = 1 / ratio;
-
-        if (ratio < ControlWidth / (float)ControlHeight)
+        if (curRatio < fillRatio)
         {
-            newHeight = (int)(ControlHeight * zoom);
-            newWidth = (int)(newHeight * ratio);
+            newHeight   = (int)(ControlHeight * zoom);
+            newWidth    = (int)(newHeight * curRatio);
 
-            SideXPixels = newWidth > ControlWidth && false ? 0 : (int)(ControlWidth - (ControlHeight * ratio)); // TBR
+            SideXPixels = (int) (ControlWidth - (ControlHeight * curRatio));
             SideYPixels = 0;
 
             y = PanYOffset;
@@ -315,10 +303,10 @@ public partial class Renderer
         }
         else
         {
-            newWidth = (int)(ControlWidth * zoom);
-            newHeight = (int)(newWidth / ratio);
+            newWidth    = (int)(ControlWidth * zoom);
+            newHeight   = (int)(newWidth / curRatio);
 
-            SideYPixels = newHeight > ControlHeight && false ? 0 : (int)(ControlHeight - (ControlWidth / ratio));
+            SideYPixels = (int) (ControlHeight - (ControlWidth / curRatio));
             SideXPixels = 0;
 
             x = PanXOffset;
@@ -328,36 +316,38 @@ public partial class Renderer
             yZoomPixels = newHeight - (ControlHeight - SideYPixels);
         }
 
-        // Don't let the user pan or zoom outside of half the video's height
-        int newY = (int)(y - yZoomPixels * (float)zoomCenter.Y);
-        int bottom = newHeight + newY;
-        if (newY > ControlHeight / 2d)
         {
-            y = (int)((ControlHeight / 2d) + yZoomPixels * (float)zoomCenter.Y);
-            panYOffset = y - SideYPixels / 2;
-        }
-        else if (bottom < ControlHeight / 2d)
-        {
-            int newBottom = (int)(ControlHeight / 2d);
-            int newNewY = newBottom - newHeight;
-            y = (int)(newNewY + yZoomPixels * (float)zoomCenter.Y);
-            panYOffset = y - SideYPixels / 2;
-        }
+            // Don't let the user pan or zoom outside of half the video's height
+            int newY = (int)(y - yZoomPixels * (float)zoomCenter.Y);
+            int bottom = newHeight + newY;
+            if (newY > ControlHeight / 2d)
+            {
+                y = (int)((ControlHeight / 2d) + yZoomPixels * (float)zoomCenter.Y);
+                panYOffset = y - SideYPixels / 2;
+            }
+            else if (bottom < ControlHeight / 2d)
+            {
+                int newBottom = (int)(ControlHeight / 2d);
+                int newNewY = newBottom - newHeight;
+                y = (int)(newNewY + yZoomPixels * (float)zoomCenter.Y);
+                panYOffset = y - SideYPixels / 2;
+            }
 
-        // Don't let the user pan or zoom outside of half the video's width
-        int newX = (int)(x - xZoomPixels * (float)zoomCenter.X);
-        int right = newWidth + newX;
-        if (newX > ControlWidth / 2d)
-        {
-            x = (int)((ControlWidth / 2d) + xZoomPixels * (float)zoomCenter.X);
-            panXOffset = x - SideXPixels / 2;
-        }
-        else if (right < ControlWidth / 2d)
-        {
-            int newRight = (int)(ControlWidth / 2d);
-            int newNewX = newRight - newWidth;
-            x = (int)(newNewX + xZoomPixels * (float)zoomCenter.X);
-            panXOffset = x - SideXPixels / 2;
+            // Don't let the user pan or zoom outside of half the video's width
+            int newX = (int)(x - xZoomPixels * (float)zoomCenter.X);
+            int right = newWidth + newX;
+            if (newX > ControlWidth / 2d)
+            {
+                x = (int)((ControlWidth / 2d) + xZoomPixels * (float)zoomCenter.X);
+                panXOffset = x - SideXPixels / 2;
+            }
+            else if (right < ControlWidth / 2d)
+            {
+                int newRight = (int)(ControlWidth / 2d);
+                int newNewX = newRight - newWidth;
+                x = (int)(newNewX + xZoomPixels * (float)zoomCenter.X);
+                panXOffset = x - SideXPixels / 2;
+            }
         }
 
         GetViewport = new Vortice.Mathematics.Viewport(x - xZoomPixels * (float)zoomCenter.X, y - yZoomPixels * (float)zoomCenter.Y, newWidth, newHeight);
@@ -365,63 +355,93 @@ public partial class Renderer
 
         if (videoProcessor == VideoProcessors.D3D11)
         {
-            RawRect src, dst;
+            Viewport view = GetViewport;
 
-            if (GetViewport.Width < 1 || GetViewport.X + GetViewport.Width <= 0 || GetViewport.X >= ControlWidth || GetViewport.Y + GetViewport.Height <= 0 || GetViewport.Y >= ControlHeight)
-            { // Out of screen
-                src = new RawRect();
-                dst = new RawRect();
+            int right   = (int)(view.X + view.Width);
+            int bottom  = (int)(view.Y + view.Height);
+
+            if (view.Width < 1 || view.Y >= ControlHeight || view.X >= ControlWidth || bottom <= 0 || right <= 0)
+                return;
+
+            RawRect dst = new(
+                    Math.Max((int)view.X, 0),
+                    Math.Max((int)view.Y, 0),
+                    Math.Min(right, ControlWidth),
+                    Math.Min(bottom, ControlHeight));
+            
+            double croppedWidth     = VideoRect.Right   - (cropRect.Right  + cropRect.Left);
+            double croppedHeight    = VideoRect.Bottom  - (cropRect.Bottom + cropRect.Top);
+            int dstWidth    = dst.Right  - dst.Left;
+            int dstHeight   = dst.Bottom - dst.Top;
+
+            int     cropLeft,   cropTop,    cropRight,  cropBottom;
+            int     srcLeft,    srcTop,     srcRight,   srcBottom;
+            double  scaleX,     scaleY,     scaleXRot,  scaleYRot;
+
+            if (_RotationAngle == 0)
+            {
+                cropLeft    = view.X < 0 ? (int)(-view.X) : 0;
+                cropTop     = view.Y < 0 ? (int)(-view.Y) : 0;
+
+                scaleX      = croppedWidth  / view.Width;
+                scaleY      = croppedHeight / view.Height;
+
+                srcLeft     = (int)(cropRect.Left + cropLeft * scaleX);
+                srcTop      = (int)(cropRect.Top  + cropTop  * scaleY);
+                srcRight    = srcLeft + (int)(dstWidth  * scaleX);
+                srcBottom   = srcTop  + (int)(dstHeight * scaleY);
+            }
+            else if (_RotationAngle == 180)
+            {
+                cropRight   = right  > ControlWidth  ? right  - ControlWidth  : 0;
+                cropBottom  = bottom > ControlHeight ? bottom - ControlHeight : 0;
+
+                scaleX      = croppedWidth  / view.Width;
+                scaleY      = croppedHeight / view.Height;
+                
+                srcLeft     = (int)(cropRect.Left + cropRight  * scaleX);
+                srcTop      = (int)(cropRect.Top  + cropBottom * scaleY);
+                srcRight    = srcLeft + (int)(dstWidth  * scaleX);
+                srcBottom   = srcTop  + (int)(dstHeight * scaleY);
+            }
+            else if (_RotationAngle == 90)
+            {
+                cropTop     = view.Y < 0 ? (int)(-view.Y) : 0;
+                cropRight   = right > ControlWidth ? right - ControlWidth : 0;
+
+                scaleXRot   = croppedWidth  / view.Height;
+                scaleYRot   = croppedHeight / view.Width;
+                
+                srcLeft     = (int)(cropRect.Left + cropTop    * scaleXRot);
+                srcTop      = (int)(cropRect.Top  + cropRight  * scaleYRot);
+                srcRight    = srcLeft + (int)(dstHeight * scaleXRot);
+                srcBottom   = srcTop  + (int)(dstWidth  * scaleYRot);
+            }
+            else if (_RotationAngle == 270)
+            {
+                cropLeft    = view.X < 0 ? (int)(-view.X) : 0;
+                cropBottom  = bottom > ControlHeight ? bottom - ControlHeight : 0;
+
+                scaleXRot   = croppedWidth  / view.Height;
+                scaleYRot   = croppedHeight / view.Width;
+                
+                srcLeft     = (int)(cropRect.Left + cropBottom * scaleXRot);
+                srcTop      = (int)(cropRect.Top  + cropLeft   * scaleYRot);
+                srcRight    = srcLeft + (int)(dstHeight * scaleXRot);
+                srcBottom   = srcTop  + (int)(dstWidth  * scaleYRot);
             }
             else
-            {
-                int cropLeft    = GetViewport.X < 0 ? (int) GetViewport.X * -1 : 0;
-                int cropRight   = GetViewport.X + GetViewport.Width > ControlWidth ? (int) (GetViewport.X + GetViewport.Width - ControlWidth) : 0;
-                int cropTop     = GetViewport.Y < 0 ? (int) GetViewport.Y * -1 : 0;
-                int cropBottom  = GetViewport.Y + GetViewport.Height > ControlHeight ? (int) (GetViewport.Y + GetViewport.Height - ControlHeight) : 0;
-
-                dst = new RawRect(
-                    Math.Max((int)GetViewport.X, 0),
-                    Math.Max((int)GetViewport.Y, 0),
-                    Math.Min((int)GetViewport.Width + (int)GetViewport.X, ControlWidth),
-                    Math.Min((int)GetViewport.Height + (int)GetViewport.Y, ControlHeight));
-
-                if (_RotationAngle == 90)
-                {
-                    src = new RawRect(
-                        (int)(cropTop * (VideoRect.Right / GetViewport.Height)),
-                        (int)(cropRight * (VideoRect.Bottom / GetViewport.Width)),
-                        VideoRect.Right - (int)(cropBottom * VideoRect.Right / GetViewport.Height),
-                        VideoRect.Bottom - (int)(cropLeft * VideoRect.Bottom / GetViewport.Width));
-                }
-                else if (_RotationAngle == 270)
-                {
-                    src = new RawRect(
-                        (int)(cropBottom * VideoRect.Right / GetViewport.Height),
-                        (int)(cropLeft * VideoRect.Bottom / GetViewport.Width),
-                        VideoRect.Right - (int)(cropTop * VideoRect.Right / GetViewport.Height),
-                        VideoRect.Bottom - (int)(cropRight * VideoRect.Bottom / GetViewport.Width));
-                }
-                else if (_RotationAngle == 180)
-                {
-                    src = new RawRect(
-                        (int)(cropRight * VideoRect.Right / GetViewport.Width),
-                        (int)(cropBottom * VideoRect.Bottom / GetViewport.Height),
-                        VideoRect.Right - (int)(cropLeft * VideoRect.Right / GetViewport.Width),
-                        VideoRect.Bottom - (int)(cropTop * VideoRect.Bottom / GetViewport.Height));
-                }
-                else
-                {
-                    src = new RawRect(
-                        (int)(cropLeft * VideoRect.Right / GetViewport.Width),
-                        (int)(cropTop * VideoRect.Bottom / GetViewport.Height),
-                        VideoRect.Right - (int)(cropRight * VideoRect.Right / GetViewport.Width),
-                        VideoRect.Bottom - (int)(cropBottom * VideoRect.Bottom / GetViewport.Height));
-                }
-            }
-
+                srcLeft = srcTop = srcRight = srcBottom = 0;
+            
+            RawRect src = new(
+                Math.Max(srcLeft, 0),
+                Math.Max(srcTop , 0),
+                Math.Min(srcRight , VideoRect.Right),
+                Math.Min(srcBottom, VideoRect.Bottom));
+            
             vc.VideoProcessorSetStreamSourceRect(vp, 0, true, src);
-            vc.VideoProcessorSetStreamDestRect(vp, 0, true, dst);
-            vc.VideoProcessorSetOutputTargetRect(vp, true, new RawRect(0, 0, ControlWidth, ControlHeight));
+            vc.VideoProcessorSetStreamDestRect  (vp, 0, true, dst);
+            vc.VideoProcessorSetOutputTargetRect(vp, true, new(0, 0, ControlWidth, ControlHeight));
         }
 
         if (refresh)
@@ -440,9 +460,12 @@ public partial class Renderer
                 bitmap2d?.Dispose();
                 bitmap2d = null;
             }
-
-            ControlWidth = width;
-            ControlHeight = height;
+            
+            ControlWidth    = width;
+            ControlHeight   = height;
+            fillRatio = ControlWidth / (double)ControlHeight;
+            if (Config.Video.AspectRatio == AspectRatio.Fill)
+                curRatio = fillRatio;
 
             backBufferRtv.Dispose();
             vpov?.Dispose();

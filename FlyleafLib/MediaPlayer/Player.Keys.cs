@@ -1,9 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using System.Windows.Input;
-
-using static FlyleafLib.Logger;
 
 namespace FlyleafLib.MediaPlayer;
 
@@ -311,6 +307,10 @@ public class KeysConfig
         Add(Key.Left,               KeyBindingAction.SeekBackward2, false, true);
         Add(Key.Right,              KeyBindingAction.SeekForward);
         Add(Key.Right,              KeyBindingAction.SeekForward2, false, true);
+        Add(Key.PageUp,             KeyBindingAction.SeekBackward3);
+        Add(Key.PageDown,           KeyBindingAction.SeekForward3);
+        Add(Key.Home,               KeyBindingAction.SeekToStart);
+        Add(Key.End,                KeyBindingAction.SeekToEnd);
         Add(Key.Left,               KeyBindingAction.ShowPrevFrame, false, false, true);
         Add(Key.Right,              KeyBindingAction.ShowNextFrame, false, false, true);
 
@@ -468,6 +468,12 @@ public class KeysConfig
             case KeyBindingAction.SeekForward3:
                 return player.SeekForward3;
 
+            case KeyBindingAction.SeekToStart:
+                return player.SeekToStart;
+
+            case KeyBindingAction.SeekToEnd:
+                return player.SeekToEnd;
+
             case KeyBindingAction.SpeedAdd:
                 return player.SpeedUp;
 
@@ -526,6 +532,8 @@ public class KeysConfig
         { KeyBindingAction.Stop },
         { KeyBindingAction.Flush },
         { KeyBindingAction.ToggleSeekAccurate },
+        { KeyBindingAction.SeekToStart },
+        { KeyBindingAction.SeekToEnd },
         { KeyBindingAction.SpeedAdd },
         { KeyBindingAction.SpeedAdd2 },
         { KeyBindingAction.SpeedRemove },
@@ -561,6 +569,7 @@ public class KeyBinding
     internal Action ActionInternal;
 }
 
+// NOTE: To be able to support compatibility with previous config versions add new to end?
 public enum KeyBindingAction
 {
     Custom,
@@ -585,4 +594,6 @@ public enum KeyBindingAction
 
     ResetAll,
     ZoomIn, ZoomOut,
+
+    SeekToStart, SeekToEnd,
 }

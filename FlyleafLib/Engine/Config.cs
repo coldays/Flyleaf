@@ -14,8 +14,6 @@ using FlyleafLib.MediaFramework.MediaRenderer;
 using FlyleafLib.MediaPlayer;
 using FlyleafLib.Plugins;
 
-using static FlyleafLib.Utils;
-
 namespace FlyleafLib;
 
 /// <summary>
@@ -579,13 +577,6 @@ public class Config : NotifyPropertyChanged
         public int              MaxErrors       { get; set; } = 200;
 
         /// <summary>
-        /// Whether or not to use decoder's textures directly as shader resources
-        /// (TBR: Better performance but might need to be disabled while video input has padding or not supported by older Direct3D versions)
-        /// </summary>
-        public ZeroCopy         ZeroCopy        { get => _ZeroCopy; set { if (SetUI(ref _ZeroCopy, value) && player != null && player.Video.isOpened) player.VideoDecoder?.RecalculateZeroCopy(); } }
-        ZeroCopy _ZeroCopy = ZeroCopy.Auto;
-
-        /// <summary>
         /// Allows video accceleration even in codec's profile mismatch
         /// </summary>
         public bool             AllowProfileMismatch
@@ -641,13 +632,13 @@ public class Config : NotifyPropertyChanged
         /// <summary>
         /// Video aspect ratio
         /// </summary>
-        public AspectRatio      AspectRatio                 { get => _AspectRatio;  set { if (Set(ref _AspectRatio, value) && player != null && player.renderer != null && !player.renderer.SCDisposed) lock(player.renderer.lockDevice) {  player.renderer.SetViewport(); if (player.renderer.child != null) player.renderer.child.SetViewport(); } } }
+        public AspectRatio      AspectRatio                 { get => _AspectRatio;          set { if (Set(ref _AspectRatio, value))     player?.renderer?.UpdateAspectRatio(); } }
         AspectRatio    _AspectRatio = AspectRatio.Keep;
 
         /// <summary>
         /// Custom aspect ratio (AspectRatio must be set to Custom to have an effect)
         /// </summary>
-        public AspectRatio      CustomAspectRatio           { get => _CustomAspectRatio;  set { if (Set(ref _CustomAspectRatio, value) && AspectRatio == AspectRatio.Custom) { _AspectRatio = AspectRatio.Fill; AspectRatio = AspectRatio.Custom; } } }
+        public AspectRatio      CustomAspectRatio           { get => _CustomAspectRatio;    set { if (Set(ref _CustomAspectRatio, value) && AspectRatio == AspectRatio.Custom) { _AspectRatio = AspectRatio.Fill; AspectRatio = AspectRatio.Custom; } } }
         AspectRatio    _CustomAspectRatio = new(16, 9);
 
         /// <summary>
@@ -661,6 +652,17 @@ public class Config : NotifyPropertyChanged
         /// Clears the screen on stop/close/open
         /// </summary>
         public bool             ClearScreen                 { get; set; } = true;
+
+        /// <summary>
+        /// Cropping rectagle to crop the output frame (based on frame size)
+        /// </summary>
+        [XmlIgnore]
+#if NET5_0_OR_GREATER
+        [JsonIgnore]
+#endif
+        public CropRect         Crop                        { get => _Crop;             set { _Crop = value; HasUserCrop = _Crop != CropRect.Empty; player?.renderer?.UpdateCropping(); } }
+        internal CropRect _Crop = CropRect.Empty;
+        internal bool HasUserCrop = false;
 
         /// <summary>
         /// Whether video should be allowed
@@ -726,7 +728,7 @@ public class Config : NotifyPropertyChanged
         /// * D3D11 possible performs better with color conversion and filters, FLVP supports only brightness/contrast filters<br/>
         /// * D3D11 supports deinterlace (bob)
         /// </summary>
-        public VideoProcessors  VideoProcessor              { get => _VideoProcessor; set { if (Set(ref _VideoProcessor, value)) player?.renderer?.UpdateVideoProcessor(); } }
+        public VideoProcessors  VideoProcessor              { get => _VideoProcessor;   set { if (Set(ref _VideoProcessor, value))  player?.renderer?.UpdateVideoProcessor(); } }
         VideoProcessors _VideoProcessor = VideoProcessors.Auto;
 
         /// <summary>
@@ -741,20 +743,20 @@ public class Config : NotifyPropertyChanged
         public Vortice.DXGI.PresentFlags
                                 PresentFlags                { get; set; } = Vortice.DXGI.PresentFlags.DoNotWait;
 
-        public DeInterlace      DeInterlace                 { get => _DeInterlace;  set { if (Set(ref _DeInterlace, value)) player?.renderer?.UpdateDeinterlace(); } }
+        public DeInterlace      DeInterlace                 { get => _DeInterlace;      set { if (Set(ref _DeInterlace, value))     player?.renderer?.UpdateDeinterlace(); } }
         DeInterlace _DeInterlace = DeInterlace.Auto;
 
         /// <summary>
         /// The HDR to SDR method that will be used by the pixel shader
         /// </summary>
         public unsafe HDRtoSDRMethod
-                                HDRtoSDRMethod              { get => _HDRtoSDRMethod; set { if (Set(ref _HDRtoSDRMethod, value) && player != null && player.VideoDecoder.VideoStream != null && player.VideoDecoder.VideoStream.ColorSpace == ColorSpace.BT2020) player.renderer.UpdateHDRtoSDR(); }}
+                                HDRtoSDRMethod              { get => _HDRtoSDRMethod;   set { if (Set(ref _HDRtoSDRMethod, value))  player?.renderer?.UpdateHDRtoSDR(); }}
         HDRtoSDRMethod _HDRtoSDRMethod = HDRtoSDRMethod.Hable;
 
         /// <summary>
         /// SDR Display Peak Luminance (will be used for HDR to SDR conversion)
         /// </summary>
-        public unsafe float     SDRDisplayNits              { get => _SDRDisplayNits; set { if (Set(ref _SDRDisplayNits, value) && player != null && player.VideoDecoder.VideoStream != null && player.VideoDecoder.VideoStream.ColorSpace == ColorSpace.BT2020) player.renderer.UpdateHDRtoSDR(); } }
+        public unsafe float     SDRDisplayNits              { get => _SDRDisplayNits;   set { if (Set(ref _SDRDisplayNits, value))  player?.renderer?.UpdateHDRtoSDR(); } }
         float _SDRDisplayNits = Engine.Video.RecommendedLuminance;
 
         /// <summary>
@@ -1004,7 +1006,7 @@ public class EngineConfig
     /// <para>:console -> System.Console</para>
     /// <para>&lt;path&gt; -> Absolute or relative file path</para>
     /// </summary>
-    public string   LogOutput               { get => _LogOutput; set { _LogOutput = value; if (Engine.IsLoaded) Logger.SetOutput(); } }
+    public string   LogOutput               { get => _LogOutput; set { _LogOutput = value; if (Engine.IsLoaded) SetOutput(); } }
     string _LogOutput = "";
 
     /// <summary>

@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.ObjectModel;
-
-using Vortice.Multimedia;
+﻿using Vortice.Multimedia;
 using Vortice.XAudio2;
 
 using static Vortice.XAudio2.XAudio2;
@@ -9,8 +6,6 @@ using static Vortice.XAudio2.XAudio2;
 using FlyleafLib.MediaFramework.MediaContext;
 using FlyleafLib.MediaFramework.MediaFrame;
 using FlyleafLib.MediaFramework.MediaStream;
-
-using static FlyleafLib.Logger;
 
 namespace FlyleafLib.MediaPlayer;
 
@@ -24,6 +19,9 @@ public class Audio : NotifyPropertyChanged
     /// </summary>
     public ObservableCollection<AudioStream>
                     Streams         => decoder?.VideoDemuxer.AudioStreams; // TBR: We miss AudioDemuxer embedded streams
+
+    public int      StreamIndex     { get => streamIndex;       internal set => Set(ref _StreamIndex, value); }
+    int _StreamIndex, streamIndex = -1;
 
     /// <summary>
     /// Whether the input has audio and it is configured
@@ -173,6 +171,7 @@ public class Audio : NotifyPropertyChanged
 
         uiAction = () =>
         {
+            StreamIndex     = streamIndex;
             IsOpened        = IsOpened;
             Codec           = Codec;
             BitRate         = BitRate;
@@ -260,7 +259,7 @@ public class Audio : NotifyPropertyChanged
             try
             {
                 if (CanTrace)
-                    player.Log.Trace($"[A] Presenting {Utils.TicksToTime(player.aFrame.timestamp)}");
+                    player.Log.Trace($"[A] Presenting {TicksToTime(player.aFrame.timestamp)}");
 
                 framesDisplayed++;
 
@@ -298,6 +297,7 @@ public class Audio : NotifyPropertyChanged
 
     internal void Reset()
     {
+        streamIndex     = -1;
         codec           = null;
         bitRate         = 0;
         bits            = 0;
@@ -313,6 +313,7 @@ public class Audio : NotifyPropertyChanged
     {
         if (decoder.AudioStream == null) { Reset(); return; }
 
+        streamIndex     = decoder.AudioStream.StreamIndex;
         codec           = decoder.AudioStream.Codec;
         bits            = decoder.AudioStream.Bits;
         channels        = decoder.AudioStream.Channels;

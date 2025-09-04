@@ -1,13 +1,13 @@
 ﻿using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
+
 using Vortice;
 using Vortice.Direct3D;
 using Vortice.Direct3D11;
 using Vortice.DXGI;
 using Vortice.DXGI.Debug;
 
-using static FlyleafLib.Logger;
 using ID3D11Device = Vortice.Direct3D11.ID3D11Device;
 using ID3D11DeviceContext = Vortice.Direct3D11.ID3D11DeviceContext;
 
@@ -98,12 +98,12 @@ public unsafe partial class Renderer
     ID3D11PixelShader   ShaderBGRA;
 
     ID3D11Buffer        psBuffer;
-    PSBufferType        psBufferData = new();
+    PSBufferType        psBufferData    = new();
 
     ID3D11Buffer        vsBuffer;
-    VSBufferType        vsBufferData;
+    VSBufferType        vsBufferData    = new();
 
-    internal object     lockDevice = new();
+    internal object     lockDevice      = new();
     bool                isFlushing;
 
     public void Initialize(bool swapChain = true)
@@ -251,7 +251,6 @@ public unsafe partial class Renderer
                     ByteWidth       = (int)(sizeof(PSBufferType) + (16 - (sizeof(PSBufferType) % 16)))
                 });
                 context.PSSetConstantBuffer(0, psBuffer);
-                psBufferData.fieldType = FieldType;
 
                 // subs
                 ShaderBGRA = ShaderCompiler.CompilePS(Device, "bgra", @"color = float4(Texture1.Sample(Sampler, input.Texture).rgba);".AsSpan(), null);
@@ -465,7 +464,7 @@ public unsafe partial class Renderer
             VideoDecoder.Dispose();
             Flush();
             VideoDecoder.Open(stream); // Should Re-ConfigPlanes()
-            VideoDecoder.keyPacketRequired = true;
+            VideoDecoder.keyPacketRequired = !VideoDecoder.isIntraOnly;
             if (running)
                 VideoDecoder.Start();
         }
@@ -499,13 +498,8 @@ public unsafe partial class Renderer
         public float saturation;    //  0.0  to 2.0     (1.0 default)
 
         public float uvOffset;
-        public float yoffset;
         public HDRtoSDRMethod tonemap;
         public float hdrtone;
-        public DeInterlace fieldType;
-
-        private float _pad1;
-        private float _pad2;
 
         public PSBufferType()
         {
@@ -513,15 +507,17 @@ public unsafe partial class Renderer
             contrast    = 1;
             hue         = 0;
             saturation  = 1;
-
             tonemap     = HDRtoSDRMethod.Hable;
-            fieldType   = DeInterlace.Progressive;
         }
     }
 
     [StructLayout(LayoutKind.Sequential)]
     struct VSBufferType
     {
-        public Matrix4x4 mat;
+        public Matrix4x4    mat;
+        public Vector4      cropRegion;
+        
+        public VSBufferType()
+            => cropRegion = new(0, 0, 1, 1);
     }
 }

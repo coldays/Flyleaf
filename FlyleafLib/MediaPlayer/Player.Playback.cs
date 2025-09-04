@@ -1,11 +1,4 @@
-﻿using System;
-using System.Threading;
-using System.Threading.Tasks;
-
-using FlyleafLib.MediaFramework.MediaDecoder;
-
-using static FlyleafLib.Utils;
-using static FlyleafLib.Logger;
+﻿using FlyleafLib.MediaFramework.MediaDecoder;
 
 namespace FlyleafLib.MediaPlayer;
 
@@ -96,7 +89,8 @@ partial class Player
                 vFrame = null;
                 sFrame = null;
 
-                renderer.CurFieldType = renderer.FieldType;
+                if (renderer.FieldType != Vortice.Direct3D11.VideoFrameFormat.Progressive)
+                    renderer.SetFieldType(renderer.FieldType);
 
                 if (Status == Status.Stopped)
                     decoder?.Initialize();

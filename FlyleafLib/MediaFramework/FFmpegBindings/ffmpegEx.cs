@@ -271,4 +271,3 @@ internal unsafe partial class ffmpegEx
 #pragma warning restore CS0169
 #pragma warning restore CS0649
 }
-    

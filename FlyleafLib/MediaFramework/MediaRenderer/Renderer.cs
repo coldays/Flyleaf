@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using System.Windows;
 
 using Vortice;
@@ -59,6 +58,13 @@ public partial class Renderer : NotifyPropertyChanged, IDisposable
     public Viewport         GetViewport     { get; private set; }
     public event EventHandler ViewportChanged;
 
+    public uint             VisibleWidth    { get; private set; }
+    public uint             VisibleHeight   { get; private set; }
+    public AspectRatio      DAR             { get; set; }
+    double curRatio, keepRatio, fillRatio;
+    CropRect cropRect; // + User's Cropping
+    uint textWidth, textHeight; // Padded (Codec/Texture)
+
     public CornerRadius     CornerRadius    { get => cornerRadius;              set { if (cornerRadius == value) return; cornerRadius = value; UpdateCornerRadius(); } }
     CornerRadius cornerRadius = new CornerRadius(0);
     CornerRadius zeroCornerRadius = new CornerRadius(0);
@@ -96,20 +102,19 @@ public partial class Renderer : NotifyPropertyChanged, IDisposable
         }
     }
 
-    public uint             Rotation        { get => _RotationAngle;            set { lock (lockDevice) UpdateRotation(value); } }
+    public uint             Rotation        { get => _RotationAngle;            set => UpdateRotation(value); }
     uint _RotationAngle;
     VideoProcessorRotation _d3d11vpRotation  = VideoProcessorRotation.Identity;
     bool rotationLinesize; // if negative should be vertically flipped
 
-    public bool             HFlip           { get => _HFlip;                    set { _HFlip = value; lock (lockDevice) UpdateRotation(_RotationAngle); } }
+    public bool             HFlip           { get => _HFlip;                    set { _HFlip = value; UpdateRotation(_RotationAngle); } }
     bool _HFlip;
 
-    public bool             VFlip           { get => _VFlip;                    set { _VFlip = value; lock (lockDevice) UpdateRotation(_RotationAngle); } }
+    public bool             VFlip           { get => _VFlip;                    set { _VFlip = value; UpdateRotation(_RotationAngle); } }
     bool _VFlip;
 
-    public DeInterlace      FieldType       { get => _DeInterlace;              private  set => SetUI(ref _DeInterlace, value); }
-    DeInterlace _DeInterlace = DeInterlace.Progressive;
-    public DeInterlace      CurFieldType    { get => psBufferData.fieldType;    internal set { if (value != psBufferData.fieldType) SetFieldType(value); } }
+    public VideoFrameFormat FieldType       { get => _FieldType;                private  set => SetUI(ref _FieldType, value); }
+    VideoFrameFormat _FieldType = VideoFrameFormat.Progressive;
 
     public VideoProcessors  VideoProcessor  { get => videoProcessor;            private  set => SetUI(ref videoProcessor, value); }
     VideoProcessors videoProcessor = VideoProcessors.Flyleaf;
@@ -215,10 +220,10 @@ public partial class Renderer : NotifyPropertyChanged, IDisposable
 
     public Renderer(VideoDecoder videoDecoder, IntPtr handle, int uniqueId = -1)
     {
-        UniqueId    = uniqueId == -1 ? Utils.GetUniqueId() : uniqueId;
+        UniqueId    = uniqueId == -1 ? GetUniqueId() : uniqueId;
         VideoDecoder= videoDecoder;
         Config      = videoDecoder.Config;
-        Log         = new LogHandler(("[#" + UniqueId + "]").PadRight(8, ' ') + " [Renderer      ] ");
+        Log         = new(("[#" + UniqueId + "]").PadRight(8, ' ') + " [Renderer      ] ");
         use2d       = Config.Video.Use2DGraphics;
 
         overlayTextureDesc = new Texture2DDescription()
@@ -230,10 +235,10 @@ public partial class Renderer : NotifyPropertyChanged, IDisposable
             ArraySize   = 1,
             MipLevels   = 1,
             BindFlags   = BindFlags.ShaderResource,
-            SampleDescription = new SampleDescription(1, 0)
+            SampleDescription = new(1, 0)
         };
 
-        singleStageDesc = new Texture2DDescription()
+        singleStageDesc = new()
         {
             Usage       = ResourceUsage.Staging,
             Format      = Format.B8G8R8A8_UNorm,
@@ -241,20 +246,20 @@ public partial class Renderer : NotifyPropertyChanged, IDisposable
             MipLevels   = 1,
             BindFlags   = BindFlags.None,
             CPUAccessFlags      = CpuAccessFlags.Read,
-            SampleDescription   = new SampleDescription(1, 0),
+            SampleDescription   = new(1, 0),
 
             Width       = 0,
             Height      = 0
         };
 
-        singleGpuDesc = new Texture2DDescription()
+        singleGpuDesc = new()
         {
             Usage       = ResourceUsage.Default,
             Format      = Format.B8G8R8A8_UNorm,
             ArraySize   = 1,
             MipLevels   = 1,
             BindFlags   = BindFlags.RenderTarget | BindFlags.ShaderResource,
-            SampleDescription   = new SampleDescription(1, 0)
+            SampleDescription   = new(1, 0)
         };
 
         wndProcDelegate = new Utils.NativeMethods.SubclassWndProc(WndProc);
@@ -268,8 +273,8 @@ public partial class Renderer : NotifyPropertyChanged, IDisposable
     Renderer parent;
     public Renderer(Renderer renderer, IntPtr handle, int uniqueId = -1)
     {
-        UniqueId            = uniqueId == -1 ? Utils.GetUniqueId() : uniqueId;
-        Log                 = new LogHandler(("[#" + UniqueId + "]").PadRight(8, ' ') + " [Renderer  Repl] ");
+        UniqueId            = uniqueId == -1 ? GetUniqueId() : uniqueId;
+        Log                 = new(("[#" + UniqueId + "]").PadRight(8, ' ') + " [Renderer  Repl] ");
 
         renderer.child      = this;
         parent              = renderer;

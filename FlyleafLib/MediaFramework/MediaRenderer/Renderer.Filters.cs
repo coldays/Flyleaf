@@ -1,12 +1,9 @@
-﻿using System.Collections.Generic;
-using System.Linq;
+﻿using System.Linq;
 #if NET5_0_OR_GREATER
 using System.Text.Json.Serialization;
 #endif
 using System.Xml.Serialization;
 using Vortice.Direct3D11;
-
-using static FlyleafLib.Utils;
 
 namespace FlyleafLib.MediaFramework.MediaRenderer;
 
@@ -31,7 +28,6 @@ unsafe public partial class Renderer
         }
 
         alreadySetup = true;
-        UpdateHDRtoSDR(false); // TODO: Separate the only first time setup (generic)
 
         var d3Filters = curVPCC.Filters;
 

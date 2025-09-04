@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Globalization;
+﻿using System.Globalization;
 #if NET5_0_OR_GREATER
 using System.Text.Json.Serialization;
 #endif

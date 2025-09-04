@@ -20,6 +20,7 @@ public abstract unsafe class DecoderBase : RunThreadBase
     protected double speed = 1, oldSpeed = 1;
     protected virtual void OnSpeedChanged(double value) { }
 
+    internal bool               codecChanged;
     internal bool               filledFromCodec;
     protected AVFrame*          frame;
     protected AVCodecContext*   codecCtx;

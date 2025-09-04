@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 
 using static FFmpeg.AutoGen.ffmpeg;
 
@@ -13,18 +12,18 @@ public unsafe class Remuxer
     public bool                 HasStreams          => mapInOutStreams2.Count > 0 || mapInOutStreams.Count > 0;
     public bool                 HeaderWritten       { get; private set; }
 
-    Dictionary<IntPtr, IntPtr>  mapInOutStreams     = new();
-    Dictionary<int, IntPtr>     mapInInStream       = new();
-    Dictionary<int, long>       mapInStreamToDts    = new();
-    Dictionary<IntPtr, IntPtr>  mapInOutStreams2    = new();
-    Dictionary<int, IntPtr>     mapInInStream2      = new();
-    Dictionary<int, long>       mapInStreamToDts2   = new();
+    Dictionary<IntPtr, IntPtr>  mapInOutStreams     = [];
+    Dictionary<int, IntPtr>     mapInInStream       = [];
+    Dictionary<int, long>       mapInStreamToDts    = [];
+    Dictionary<IntPtr, IntPtr>  mapInOutStreams2    = [];
+    Dictionary<int, IntPtr>     mapInInStream2      = [];
+    Dictionary<int, long>       mapInStreamToDts2   = [];
 
     AVFormatContext* fmtCtx;
     AVOutputFormat* fmt;
 
     public Remuxer(int uniqueId = -1)
-        => UniqueId = uniqueId == -1 ? Utils.GetUniqueId() : uniqueId;
+        => UniqueId = uniqueId == -1 ? GetUniqueId() : uniqueId;
 
     public int Open(string filename)
     {
@@ -37,7 +36,7 @@ public unsafe class Remuxer
         if (ret < 0) return ret;
 
         fmt = fmtCtx->oformat;
-        mapInStreamToDts = new Dictionary<int, long>();
+        mapInStreamToDts = [];
         Disposed = false;
 
         return 0;
@@ -65,8 +64,8 @@ public unsafe class Remuxer
             b = av_dict_get(in_stream->metadata, "", b, AV_DICT_IGNORE_SUFFIX);
             if (b == null) break;
 
-            if (Utils.BytePtrToStringUTF8(b->key).ToLower() == "language" || Utils.BytePtrToStringUTF8(b->key).ToLower() == "lang")
-                av_dict_set(&out_stream->metadata, Utils.BytePtrToStringUTF8(b->key), Utils.BytePtrToStringUTF8(b->value), 0);
+            if (BytePtrToStringUTF8(b->key).ToLower() == "language" || BytePtrToStringUTF8(b->key).ToLower() == "lang")
+                _ = av_dict_set(&out_stream->metadata, BytePtrToStringUTF8(b->key), BytePtrToStringUTF8(b->value), 0);
         }
 
         out_stream->codecpar->codec_tag = 0;
