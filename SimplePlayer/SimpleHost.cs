@@ -344,7 +344,8 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
                         (uint)(SetWindowPosFlags.SWP_NOZORDER | SetWindowPosFlags.SWP_NOACTIVATE));
 
                     // Attache Overlay
-                    SetWindowLong(OverlayHandle, (int)WindowLongFlags.GWL_STYLE, NONE_STYLE | (nint)(WindowStyles.WS_CHILD | WindowStyles.WS_MAXIMIZE));
+                    // aka: Commented out WS_CHILD because it made the main window flicker when style was not set to None and transparent (we cannot do this becuase it overlaps the taskbar)
+                    SetWindowLong(OverlayHandle, (int)WindowLongFlags.GWL_STYLE, NONE_STYLE | (nint)(/*WindowStyles.WS_CHILD |*/ WindowStyles.WS_MAXIMIZE));
                     _overlay.Owner = Surface;
                     SetParent(OverlayHandle, SurfaceHandle);
 
@@ -375,6 +376,9 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         // For performance should focus only on ScrollViewer if any and Owner Window (other sources that clip our host?)
 
         if (!IsVisible)
+            return;
+
+        if (Owner is null)
             return;
 
         try
@@ -479,6 +483,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
 
         _mouseLeftDownPoint = e.GetPosition(window);
 
+        // PanMove
         _panPrevX = Player.PanXOffset;
         _panPrevY = Player.PanYOffset;
         IsPanMoving = true;
@@ -711,7 +716,8 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         SurfaceHandle = new WindowInteropHelper(Surface).EnsureHandle();
         Loaded += Host_Loaded;
 
-        SetWindowLong(SurfaceHandle, (int)WindowLongFlags.GWL_STYLE, NONE_STYLE | (nint)WindowStyles.WS_CHILD);
+        // aka: Commented out WS_CHILD because it made the main window flicker when style was not set to None and transparent (we cannot do this becuase it overlaps the taskbar)
+        SetWindowLong(SurfaceHandle, (int)WindowLongFlags.GWL_STYLE, NONE_STYLE /*| (nint)WindowStyles.WS_CHILD*/);
         SetWindowLong(SurfaceHandle, (int)WindowLongFlags.GWL_EXSTYLE, (nint)WindowStylesEx.WS_EX_LAYERED);
 
         Player?.VideoDecoder.CreateSwapChain(SurfaceHandle);
@@ -757,7 +763,8 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         _overlay.ShowInTaskbar = false;
         _overlay.Owner = Surface;
         SetParent(OverlayHandle, SurfaceHandle);
-        SetWindowLong(OverlayHandle, (int)WindowLongFlags.GWL_STYLE, NONE_STYLE | (nint)(WindowStyles.WS_CHILD | WindowStyles.WS_MAXIMIZE)); // TBR: WS_MAXIMIZE required? (possible better for DWM on fullscreen?)
+        // aka: Commented out WS_CHILD because it made the main window flicker when style was not set to None and transparent (we cannot do this becuase it overlaps the taskbar)
+        SetWindowLong(OverlayHandle, (int)WindowLongFlags.GWL_STYLE, NONE_STYLE | (nint)(/*WindowStyles.WS_CHILD |*/ WindowStyles.WS_MAXIMIZE)); // TBR: WS_MAXIMIZE required? (possible better for DWM on fullscreen?)
 
         _overlay.KeyUp += Overlay_KeyUp;
         _overlay.KeyDown += Overlay_KeyDown;
@@ -850,7 +857,8 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         Surface.MaxWidth = MaxWidth;
         Surface.MaxHeight = MaxHeight;
 
-        SetWindowLong(SurfaceHandle, (int)WindowLongFlags.GWL_STYLE, NONE_STYLE | (nint)WindowStyles.WS_CHILD);
+        // aka: Commented out WS_CHILD because it made the main window flicker when style was not set to None and transparent (we cannot do this becuase it overlaps the taskbar)
+        SetWindowLong(SurfaceHandle, (int)WindowLongFlags.GWL_STYLE, NONE_STYLE /*| (nint)WindowStyles.WS_CHILD*/);
         Surface.Owner = Owner;
         SetParent(SurfaceHandle, OwnerHandle);
 
