@@ -344,11 +344,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
                         (uint)(SetWindowPosFlags.SWP_NOZORDER | SetWindowPosFlags.SWP_NOACTIVATE));
 
                     // Attache Overlay
-                    unchecked
-                    {
-                        // aka: Changed WS_CHILD to WS_POPUP because it made the main window flicker when style was not set to None and transparent (we cannot do this becuase it overlaps the taskbar)
-                        SetWindowLong(OverlayHandle, (int)WindowLongFlags.GWL_STYLE, NONE_STYLE | (nint)(WindowStyles.WS_POPUP | WindowStyles.WS_MAXIMIZE));
-                    }
+                    SetWindowLong(OverlayHandle, (int)WindowLongFlags.GWL_STYLE, NONE_STYLE | (nint)(WindowStyles.WS_CHILD | WindowStyles.WS_MAXIMIZE));
                     _overlay.Owner = Surface;
                     SetParent(OverlayHandle, SurfaceHandle);
 
@@ -771,10 +767,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         _overlay.ShowInTaskbar = false;
         _overlay.Owner = Surface;
         SetParent(OverlayHandle, SurfaceHandle);
-        unchecked
-        {
-            SetWindowLong(OverlayHandle, (int)WindowLongFlags.GWL_STYLE, NONE_STYLE | (nint)(WindowStyles.WS_POPUP | WindowStyles.WS_MAXIMIZE)); // TBR: WS_MAXIMIZE required? (possible better for DWM on fullscreen?)
-        }
+        SetWindowLong(OverlayHandle, (int)WindowLongFlags.GWL_STYLE, NONE_STYLE | (nint)(WindowStyles.WS_CHILD | WindowStyles.WS_MAXIMIZE)); // TBR: WS_MAXIMIZE required? (possible better for DWM on fullscreen?)
 
         _overlay.KeyUp += Overlay_KeyUp;
         _overlay.KeyDown += Overlay_KeyDown;
