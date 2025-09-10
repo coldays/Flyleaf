@@ -344,8 +344,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
                         (uint)(SetWindowPosFlags.SWP_NOZORDER | SetWindowPosFlags.SWP_NOACTIVATE));
 
                     // Attache Overlay
-                    // aka: Commented out WS_CHILD because it made the main window flicker when style was not set to None and transparent (we cannot do this becuase it overlaps the taskbar)
-                    SetWindowLong(OverlayHandle, (int)WindowLongFlags.GWL_STYLE, NONE_STYLE | (nint)(/*WindowStyles.WS_CHILD |*/ WindowStyles.WS_MAXIMIZE));
+                    SetWindowLong(OverlayHandle, (int)WindowLongFlags.GWL_STYLE, NONE_STYLE | (nint)(WindowStyles.WS_CHILD | WindowStyles.WS_MAXIMIZE));
                     _overlay.Owner = Surface;
                     SetParent(OverlayHandle, SurfaceHandle);
 
@@ -379,7 +378,9 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
             return;
 
         if (Owner is null)
+        {
             return;
+        }
 
         try
         {
@@ -763,8 +764,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         _overlay.ShowInTaskbar = false;
         _overlay.Owner = Surface;
         SetParent(OverlayHandle, SurfaceHandle);
-        // aka: Commented out WS_CHILD because it made the main window flicker when style was not set to None and transparent (we cannot do this becuase it overlaps the taskbar)
-        SetWindowLong(OverlayHandle, (int)WindowLongFlags.GWL_STYLE, NONE_STYLE | (nint)(/*WindowStyles.WS_CHILD |*/ WindowStyles.WS_MAXIMIZE)); // TBR: WS_MAXIMIZE required? (possible better for DWM on fullscreen?)
+        SetWindowLong(OverlayHandle, (int)WindowLongFlags.GWL_STYLE, NONE_STYLE | (nint)(WindowStyles.WS_CHILD | WindowStyles.WS_MAXIMIZE)); // TBR: WS_MAXIMIZE required? (possible better for DWM on fullscreen?)
 
         _overlay.KeyUp += Overlay_KeyUp;
         _overlay.KeyDown += Overlay_KeyDown;
@@ -869,8 +869,10 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
     }
 
     public void SetRect(ref Rect rect)
-        => SetWindowPos(SurfaceHandle, nint.Zero, (int)Math.Round(rect.X * DpiX), (int)Math.Round(rect.Y * DpiY), (int)Math.Round(rect.Width * DpiX), (int)Math.Round(rect.Height * DpiY),
+    {
+        SetWindowPos(SurfaceHandle, nint.Zero, (int)Math.Round(rect.X * DpiX), (int)Math.Round(rect.Y * DpiY), (int)Math.Round(rect.Width * DpiX), (int)Math.Round(rect.Height * DpiY),
             (uint)(SetWindowPosFlags.SWP_NOZORDER | SetWindowPosFlags.SWP_NOACTIVATE));
+    }
 
     private void SetRectOverlay(object sender, SizeChangedEventArgs e)
     {
