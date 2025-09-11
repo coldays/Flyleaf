@@ -717,7 +717,7 @@ public static partial class Utils
         if (micro == 0)
             return "00:00:00.000";
 
-        return TsToTime(TimeSpan.FromMilliseconds(micro * 1000d));
+        return TsToTime(TimeSpan.FromMilliseconds(micro / 1000d));
     }
     public static string TsToTime(TimeSpan ts)
     {

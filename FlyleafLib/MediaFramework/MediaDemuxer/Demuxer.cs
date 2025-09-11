@@ -661,7 +661,7 @@ public unsafe class Demuxer : RunThreadBase
         // External Streams (mainly for .sub will have as start time the first subs timestamp)
         StartTime = fmtCtx->start_time == AV_NOPTS_VALUE || (fmtCtx->nb_streams == 1 && fmtCtx->streams[0]->codecpar->codec_type == AVMediaType.AVMEDIA_TYPE_SUBTITLE) ? 0 : fmtCtx->start_time * 10;
         if (fmtCtx->start_time_realtime != AV_NOPTS_VALUE)
-            StartRealTime = EPOCH.AddMilliseconds(fmtCtx->start_time_realtime * 1000d);
+            StartRealTime = EPOCH.AddMilliseconds(fmtCtx->start_time_realtime / 1000d);
 
         if (Engine.Config.FFmpegHLSLiveSeek && Duration == 0 && Name == "hls" && Environment.Is64BitProcess) // HLSContext cast is not safe
         {
