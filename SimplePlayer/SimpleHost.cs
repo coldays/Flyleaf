@@ -114,13 +114,6 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
     public static readonly DependencyProperty OverlayTemplateProperty =
         DependencyProperty.Register(nameof(OverlayTemplate), typeof(ControlTemplate), typeof(SimpleHost), new PropertyMetadata(null, new PropertyChangedCallback(OnOverlayTemplateChanged)));
 
-    public CornerRadius CornerRadius
-    {
-        get => (CornerRadius)GetValue(CornerRadiusProperty);
-        set => SetValue(CornerRadiusProperty, value);
-    }
-    public static readonly DependencyProperty CornerRadiusProperty =
-        DependencyProperty.Register(nameof(CornerRadius), typeof(CornerRadius), typeof(SimpleHost), new PropertyMetadata(new CornerRadius(0), new PropertyChangedCallback(OnCornerRadiusChanged)));
     #endregion
 
     #region Events
@@ -176,44 +169,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         }
         host.SetOverlay();
     }
-    private static void OnCornerRadiusChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-    {
-        if (isDesginMode)
-            return;
 
-        SimpleHost host = d as SimpleHost;
-        if (host.Disposed)
-            return;
-
-        if (host.Surface == null)
-            return;
-
-        if (host.CornerRadius == host._zeroCornerRadius)
-            host.Surface.Background = Brushes.Black;
-        else
-        {
-            host.Surface.Background = Brushes.Transparent;
-            host.SetCornerRadiusBorder();
-        }
-
-        if (host?.Player == null)
-            return;
-
-        host.Player.renderer.CornerRadius = (CornerRadius)e.NewValue;
-
-    }
-    private void SetCornerRadiusBorder()
-    {
-        // Required to handle mouse events as the window's background will be transparent
-        // This does not set the background color we do that with the renderer (which causes some issues eg. when returning from fullscreen to normalscreen)
-        Surface.Content = new Border()
-        {
-            Background = Brushes.Black, // TBR: for alpha channel -> Background == Brushes.Transparent || Background ==null ? new SolidColorBrush(Color.FromArgb(1,0,0,0)) : Background
-            HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch,
-            VerticalAlignment = VerticalAlignment.Stretch,
-            CornerRadius = CornerRadius,
-        };
-    }
     private static object OnContentChanging(DependencyObject d, object baseValue)
     {
         if (isDesginMode)
@@ -676,15 +632,10 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
 
         Player.Host = this;
         Player.Activity.Timeout = ActivityTimeout;
-        if (Player.renderer != null) // TBR: using as AudioOnly with a Control*
-            Player.renderer.CornerRadius = CornerRadius;
 
         if (Surface != null)
         {
-            if (CornerRadius == _zeroCornerRadius)
-                Surface.Background = new SolidColorBrush(Player.Config.Video.BackgroundColor);
-            //else // TBR: this border probably not required? only when we don't have a renderer?
-            //((Border)Surface.Content).Background = new SolidColorBrush(Player.Config.Video.BackgroundColor);
+            Surface.Background = new SolidColorBrush(Player.Config.Video.BackgroundColor);
 
             Player.VideoDecoder.CreateSwapChain(SurfaceHandle);
         }
@@ -702,15 +653,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         Surface.ResizeMode = ResizeMode.NoResize;
         Surface.ShowInTaskbar = false;
 
-        // CornerRadius must be set initially to AllowsTransparency! 
-        if (CornerRadius == _zeroCornerRadius)
-            Surface.Background = Player != null ? new SolidColorBrush(Player.Config.Video.BackgroundColor) : Brushes.Black;
-        else
-        {
-            Surface.AllowsTransparency = true;
-            Surface.Background = Brushes.Transparent;
-            SetCornerRadiusBorder();
-        }
+        Surface.Background = Player != null ? new SolidColorBrush(Player.Config.Video.BackgroundColor) : Brushes.Black;
 
         // When using ItemsControl with ObservableCollection<Player> to fill DataTemplates with TPGFlyleafHost EnsureHandle will call Host_loaded
         Loaded -= Host_Loaded;
