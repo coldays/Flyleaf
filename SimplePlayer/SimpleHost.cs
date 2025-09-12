@@ -1,6 +1,5 @@
 ﻿using FlyleafLib;
 using FlyleafLib.Controls;
-using FlyleafLib.Controls.WPF;
 using FlyleafLib.MediaPlayer;
 using System.ComponentModel;
 using System.Windows;
@@ -20,17 +19,15 @@ using Point = System.Windows.Point;
 
 namespace SimplePlayer;
 
-public class SimpleHost : ContentControl, IHostPlayer, IDisposable
+public class SimpleHost : ContentControl, IHostPlayer
 {
     #region Properties / Variables
     public Window Owner { get; private set; }
-    public Window Surface { get; private set; }
     public nint SurfaceHandle { get; private set; }
     public nint OverlayHandle { get; private set; }
     public nint OwnerHandle { get; private set; }
 
     public int UniqueId { get; private set; }
-    public bool Disposed { get; private set; }
 
     public double DpiX { get; private set; } = 1;
     public double DpiY { get; private set; } = 1;
@@ -39,27 +36,28 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
     public event EventHandler SurfaceCreated;
     public event EventHandler OverlayCreated;
 
-    static bool isDesginMode;
-    static int idGenerator = 1;
-    static nint NONE_STYLE = (nint)(WindowStyles.WS_MINIMIZEBOX | WindowStyles.WS_CLIPSIBLINGS | WindowStyles.WS_CLIPCHILDREN | WindowStyles.WS_VISIBLE); // WS_MINIMIZEBOX required for swapchain
-    static Rect rectRandom = new(1, 2, 3, 4);
+    private static bool isDesginMode;
+    private static int idGenerator = 1;
+    private static nint NONE_STYLE = (nint)(WindowStyles.WS_MINIMIZEBOX | WindowStyles.WS_CLIPSIBLINGS | WindowStyles.WS_CLIPCHILDREN | WindowStyles.WS_VISIBLE); // WS_MINIMIZEBOX required for swapchain
+    private static Rect rectRandom = new(1, 2, 3, 4);
 
-    bool _surfaceClosed, _surfaceClosing, _overlayClosed;
-    int _panPrevX, _panPrevY;
-    bool _isMouseBindingsSubscribedSurface;
-    bool _isMouseBindingsSubscribedOverlay;
+    private int _panPrevX, _panPrevY;
+    private bool _isMouseBindingsSubscribedSurface;
+    private bool _isMouseBindingsSubscribedOverlay;
 
-    CornerRadius _zeroCornerRadius = new(0);
-    Point _zeroPoint = new(0, 0);
-    Point _mouseLeftDownPoint = new(0, 0);
-    Point _mouseMoveLastPoint = new(0, 0);
+    private CornerRadius _zeroCornerRadius = new(0);
+    private Point _zeroPoint = new(0, 0);
+    private Point _mouseLeftDownPoint = new(0, 0);
+    private Point _mouseMoveLastPoint = new(0, 0);
 
-    Rect _zeroRect = new(0, 0, 0, 0);
-    Rect _rectInit;
-    Rect _rectInitLast = rectRandom;
-    Rect _rectIntersect;
-    Rect _rectIntersectLast = rectRandom;
+    private Rect _zeroRect = new(0, 0, 0, 0);
+    private Rect _rectInit;
+    private Rect _rectInitLast = rectRandom;
+    private Rect _rectIntersect;
+    private Rect _rectIntersectLast = rectRandom;
     private Window _overlay;
+    public Window _surface;
+    private bool _presentationSourceChanging = false;
 
     protected readonly LogHandler Log;
     #endregion
@@ -123,7 +121,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
             return;
 
         SimpleHost host = d as SimpleHost;
-        if (host.Disposed)
+        if (!host.IsLoaded)
             return;
 
         host.SetPlayer((Player)e.OldValue);
@@ -134,7 +132,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
             return;
 
         SimpleHost host = d as SimpleHost;
-        if (host.Disposed)
+        if (!host.IsLoaded)
             return;
 
         host.SetReplicaPlayer((Player)e.OldValue);
@@ -142,7 +140,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
     private static void OnActivityTimeoutChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         SimpleHost host = d as SimpleHost;
-        if (host.Disposed)
+        if (!host.IsLoaded)
             return;
 
         if (host.Player == null)
@@ -156,18 +154,11 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
             return;
 
         SimpleHost host = d as SimpleHost;
-        if (host.Disposed)
+        if (!host.IsLoaded)
             return;
 
-        if (host._overlay == null)
-        {
-            host._overlay = new Window() { WindowStyle = WindowStyle.None, ResizeMode = ResizeMode.NoResize, AllowsTransparency = true };
-        }
-        else
-        {
-            host._overlay.Template = host.OverlayTemplate;
-        }
-        host.SetOverlay();
+        host._overlay.Template = host.OverlayTemplate;
+        host.CreateOverlay();
     }
 
     private static object OnContentChanging(DependencyObject d, object baseValue)
@@ -176,7 +167,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
             return baseValue;
 
         SimpleHost host = d as SimpleHost;
-        if (host.Disposed)
+        if (!host.IsLoaded)
             return host._overlay;
 
         if (baseValue != null && host._overlay == null)
@@ -188,73 +179,114 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         return host._overlay;
     }
 
+    private void SimpleHost_Unloaded(object sender, RoutedEventArgs e)
+    {
+        if (Player is not null)
+        {
+            Player?.renderer.DisposeSwapChain();
+            Player.Host = this;
+        }
+        if (ReplicaPlayer is not null)
+        {
+            ReplicaPlayer?.renderer.DisposeSwapChain();
+            ReplicaPlayer.Host = this;
+        }
+
+        if (_overlay != null)
+        {
+            if (_isMouseBindingsSubscribedOverlay)
+                SetMouseOverlay();
+
+            _overlay.IsVisibleChanged -= OverlayStandAlone_IsVisibleChanged;
+            _overlay.KeyUp -= Overlay_KeyUp;
+            _overlay.KeyDown -= Overlay_KeyDown;
+            _overlay.Closed -= Overlay_Closed;
+            _overlay.Drop -= Overlay_Drop;
+            _overlay.DragEnter -= Overlay_DragEnter;
+
+            _overlay.Owner = null;
+            SetParent(OverlayHandle, nint.Zero);
+            _overlay.Width = _overlay.Height = 1;
+            //_overlay.Show();
+            _overlay.Close();
+        }
+
+        if (_surface != null)
+        {
+            if (_isMouseBindingsSubscribedSurface)
+                SetMouseSurface();
+
+            _surface.Closed -= Surface_Closed;
+            _surface.KeyDown -= Surface_KeyDown;
+            _surface.KeyUp -= Surface_KeyUp;
+            _surface.Drop -= Surface_Drop;
+            _surface.DragEnter -= Surface_DragEnter;
+            _surface.SizeChanged -= SetRectOverlay;
+
+            _surface.Owner = null;
+            SetParent(SurfaceHandle, nint.Zero);
+            _surface.Width = _surface.Height = 1;
+            //_surface.Show();
+            _surface.Close();
+        }
+
+        if (Owner != null)
+        {
+            Owner.SizeChanged -= Owner_SizeChanged;
+        }
+
+        _surface = null;
+        _overlay = null;
+        Owner = null;
+
+        SurfaceHandle = nint.Zero;
+        OverlayHandle = nint.Zero;
+        OwnerHandle = nint.Zero;
+    }
+
+    private void OnSourceChanged(object sender, SourceChangedEventArgs e)
+    {
+        if (IsLoaded && e.NewSource is null)
+        {
+            // View was disconnected from view
+            _presentationSourceChanging = true;
+        }
+    }
+
     private void Host_Loaded(object sender, RoutedEventArgs e)
     {
         Window owner = Window.GetWindow(this);
         if (owner == null)
             return;
 
+        _presentationSourceChanging = false;
+
         var ownerHandle = new WindowInteropHelper(owner).EnsureHandle();
-
-        // Owner Changed
-        if (Owner != null)
-        {
-            if (OwnerHandle == ownerHandle)
-                return; // Check OwnerHandle changed (NOTE: Owner can be the same class/window but the handle can be different)
-
-            Owner.SizeChanged -= Owner_SizeChanged;
-#if NET5_0_OR_GREATER
-            Owner.DpiChanged -= Owner_DpiChanged;
-#endif
-
-            Surface.Hide();
-            _overlay?.Hide();
-            // TODO?
-            //Detach();
-
-            Owner = owner;
-            OwnerHandle = ownerHandle;
-            Surface.Title = Owner.Title;
-            Surface.Icon = Owner.Icon;
-
-            Owner.SizeChanged += Owner_SizeChanged;
-#if NET5_0_OR_GREATER
-            Owner.DpiChanged += Owner_DpiChanged;
-#endif
-
-            Attach();
-            Host_IsVisibleChanged(null, new());
-
-            return;
-        }
 
         Owner = owner;
         OwnerHandle = ownerHandle;
+
+        // Create surface first
+        CreateSurface();
+
+        _surface.Title = Owner.Title;
+        _surface.Icon = Owner.Icon;
+
+        CreateOverlay();
         _overlay.DataContext = DataContext;
 
-        SetSurface();
-
-        Surface.Title = Owner.Title;
-        Surface.Icon = Owner.Icon;
-
         Owner.SizeChanged += Owner_SizeChanged;
-        DataContextChanged += Host_DataContextChanged;
-        IsVisibleChanged += Host_IsVisibleChanged;
 
         Attach();
-        Surface.Show();
-        _overlay?.Show();
-        Host_IsVisibleChanged(null, new());
+        _surface.Show();
+        _overlay.Show();
     }
 
 #if NET5_0_OR_GREATER
-    private void Owner_DpiChanged(object sender, System.Windows.DpiChangedEventArgs e)
+    protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
     {
-        if (e.OriginalSource == Owner)
-        {
-            DpiX = e.NewDpi.DpiScaleX;
-            DpiY = e.NewDpi.DpiScaleY;
-        }
+        DpiX = newDpi.DpiScaleX;
+        DpiY = newDpi.DpiScaleY;
     }
 #endif
 
@@ -264,57 +296,52 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
 
     private void Host_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
-        // TBR
-        // 1. this.DataContext: TPGFlyleafHost's DataContext will not be affected (Inheritance)
-        // 2. Overlay.DataContext: Overlay's DataContext will be TPGFlyleafHost itself
-        // 3. Overlay.DataContext.HostDataContext: TPGFlyleafHost's DataContext includes HostDataContext to access TPGFlyleafHost's DataContext
-        // 4. In case of Stand Alone will let the user to decide
+        if (!IsLoaded)
+            return;
+
         _overlay.DataContext = DataContext;
     }
 
     private void Host_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
+        if (_presentationSourceChanging)
+            return;
+        if (!IsLoaded)
+            return;
         if (IsVisible)
         {
-            Host_Loaded(null, null);
-            Surface.Show();
+            _surface.Show();
+            _overlay.Show();
 
-            if (_overlay != null)
+            // It happens (eg. with MetroWindow) that overlay left will not be equal to surface left so we reset it by detach/attach the overlay to surface (https://github.com/SuRGeoNix/Flyleaf/issues/370)
+            RECT surfRect = new();
+            RECT overRect = new();
+            GetWindowRect(SurfaceHandle, ref surfRect);
+            GetWindowRect(OverlayHandle, ref overRect);
+
+            if (surfRect.Left != overRect.Left)
             {
-                _overlay.Show();
+                // Detach Overlay
+                SetParent(OverlayHandle, nint.Zero);
+                SetWindowLong(OverlayHandle, (int)WindowLongFlags.GWL_STYLE, NONE_STYLE);
+                _overlay.Owner = null;
 
-                // It happens (eg. with MetroWindow) that overlay left will not be equal to surface left so we reset it by detach/attach the overlay to surface (https://github.com/SuRGeoNix/Flyleaf/issues/370)
-                RECT surfRect = new();
-                RECT overRect = new();
-                GetWindowRect(SurfaceHandle, ref surfRect);
-                GetWindowRect(OverlayHandle, ref overRect);
+                SetWindowPos(OverlayHandle, nint.Zero, 0, 0, (int)_surface.ActualWidth, (int)_surface.ActualHeight,
+                    (uint)(SetWindowPosFlags.SWP_NOZORDER | SetWindowPosFlags.SWP_NOACTIVATE));
 
-                if (surfRect.Left != overRect.Left)
-                {
-                    // Detach Overlay
-                    SetParent(OverlayHandle, nint.Zero);
-                    SetWindowLong(OverlayHandle, (int)WindowLongFlags.GWL_STYLE, NONE_STYLE);
-                    _overlay.Owner = null;
+                // Attache Overlay
+                SetWindowLong(OverlayHandle, (int)WindowLongFlags.GWL_STYLE, NONE_STYLE | (nint)(WindowStyles.WS_CHILD | WindowStyles.WS_MAXIMIZE));
+                _overlay.Owner = _surface;
+                SetParent(OverlayHandle, SurfaceHandle);
 
-                    SetWindowPos(OverlayHandle, nint.Zero, 0, 0, (int)Surface.ActualWidth, (int)Surface.ActualHeight,
-                        (uint)(SetWindowPosFlags.SWP_NOZORDER | SetWindowPosFlags.SWP_NOACTIVATE));
-
-                    // Attache Overlay
-                    SetWindowLong(OverlayHandle, (int)WindowLongFlags.GWL_STYLE, NONE_STYLE | (nint)(WindowStyles.WS_CHILD | WindowStyles.WS_MAXIMIZE));
-                    _overlay.Owner = Surface;
-                    SetParent(OverlayHandle, SurfaceHandle);
-
-                    // Required to restore overlay
-                    Rect tt1 = new(0, 0, 0, 0);
-                    SetRect(ref tt1);
-                }
+                // Required to restore overlay
+                Rect tt1 = new(0, 0, 0, 0);
+                SetRect(ref tt1);
             }
-
-            // TBR: First time loaded in a tab control could cause UCEERR_RENDERTHREADFAILURE (can be avoided by hide/show again here)
         }
         else
         {
-            Surface.Hide();
+            _surface.Hide();
             _overlay?.Hide();
         }
     }
@@ -396,7 +423,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
 
     private void Surface_Drop(object sender, DragEventArgs e)
     {
-        Surface.ReleaseMouseCapture();
+        _surface.ReleaseMouseCapture();
 
         if (Player == null)
             return;
@@ -404,7 +431,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         // Raise event in host
         RaiseEvent(e);
 
-        Surface.Activate();
+        _surface.Activate();
     }
     private void Overlay_Drop(object sender, DragEventArgs e)
     {
@@ -421,7 +448,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
     private void Surface_DragEnter(object sender, DragEventArgs e) { if (Player != null) e.Effects = DragDropEffects.All; }
     private void Overlay_DragEnter(object sender, DragEventArgs e) { if (Player != null) e.Effects = DragDropEffects.All; }
 
-    private void Surface_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) => SO_MouseLeftButtonDown(e, Surface);
+    private void Surface_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) => SO_MouseLeftButtonDown(e, _surface);
     private void Overlay_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) => SO_MouseLeftButtonDown(e, _overlay);
     private void SO_MouseLeftButtonDown(MouseButtonEventArgs e, Window window)
     {
@@ -457,7 +484,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         if (!IsPanMoving)
             return;
 
-        Surface.ReleaseMouseCapture();
+        _surface.ReleaseMouseCapture();
 
         if (IsPanMoving)
             IsPanMoving = false;
@@ -477,7 +504,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
 
     private void Surface_MouseMove(object sender, MouseEventArgs e)
     {
-        var cur = e.GetPosition(Surface);
+        var cur = e.GetPosition(_surface);
 
         if (Player != null && cur != _mouseMoveLastPoint)
         {
@@ -516,7 +543,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         }
     }
 
-    private void Surface_MouseLeave(object sender, MouseEventArgs e) { Surface.Cursor = Cursors.Arrow; }
+    private void Surface_MouseLeave(object sender, MouseEventArgs e) { _surface.Cursor = Cursors.Arrow; }
     private void Overlay_MouseLeave(object sender, MouseEventArgs e) { _overlay.Cursor = Cursors.Arrow; }
 
     private void Surface_MouseWheel(object sender, MouseWheelEventArgs e)
@@ -524,7 +551,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         if (Player == null || e.Delta == 0)
             return;
 
-        var cur = e.GetPosition(Surface);
+        var cur = e.GetPosition(_surface);
         Point curDpi = new(cur.X * DpiX, cur.Y * DpiY);
         if (e.Delta > 0)
             Player.ZoomIn(curDpi);
@@ -546,26 +573,22 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
 
     private void Surface_Closed(object sender, EventArgs e)
     {
-        _surfaceClosed = true;
-        Dispose();
+        // TODO: Logg here if this was unexpected...
     }
-    private void Surface_Closing(object sender, CancelEventArgs e) => _surfaceClosing = true;
     private void Overlay_Closed(object sender, EventArgs e)
     {
-        _overlayClosed = true;
-        if (!_surfaceClosing)
-            Surface?.Close();
+        // TODO: Logg here if this was unexpected...
     }
     private void OverlayStandAlone_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
         // Surface should be visible first (this happens only on initialization of standalone)
 
-        if (Surface.IsVisible)
+        if (_surface.IsVisible)
             return;
 
         if (_overlay.IsVisible)
         {
-            Surface.Show();
+            _surface.Show();
             ShowWindow(OverlayHandle, (int)ShowWindowCommands.SW_SHOWMINIMIZED);
             ShowWindow(OverlayHandle, (int)ShowWindowCommands.SW_SHOWMAXIMIZED);
         }
@@ -587,7 +610,14 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
 
         Log = new LogHandler(("[#" + UniqueId + "]").PadRight(8, ' ') + $" [TPGFlyleafHost NP] ");
         Loaded += Host_Loaded;
+        Unloaded += SimpleHost_Unloaded;
+        DataContextChanged += Host_DataContextChanged;
+        IsVisibleChanged += Host_IsVisibleChanged;
+
+        // This event will fire when we swap the host between windows
+        PresentationSource.AddSourceChangedHandler(this, OnSourceChanged);
     }
+
     #endregion
 
     #region Methods
@@ -602,7 +632,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         if (ReplicaPlayer == null)
             return;
 
-        if (Surface != null)
+        if (_surface != null)
             ReplicaPlayer.renderer.SetChildHandle(SurfaceHandle);
     }
     public virtual void SetPlayer(Player oldPlayer)
@@ -633,31 +663,31 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         Player.Host = this;
         Player.Activity.Timeout = ActivityTimeout;
 
-        if (Surface != null)
+        if (_surface != null)
         {
-            Surface.Background = new SolidColorBrush(Player.Config.Video.BackgroundColor);
+            _surface.Background = new SolidColorBrush(Player.Config.Video.BackgroundColor);
 
             Player.VideoDecoder.CreateSwapChain(SurfaceHandle);
         }
     }
-    public virtual void SetSurface(bool fromSetOverlay = false)
+    private void CreateSurface()
     {
-        if (Surface != null)
+        if (_surface != null)
             return;
 
         // Required for some reason (WindowStyle.None will not be updated with our style)
-        Surface = new();
-        Surface.Name = $"Surface_{UniqueId}";
-        Surface.Width = Surface.Height = 1; // Will be set on loaded
-        Surface.WindowStyle = WindowStyle.None;
-        Surface.ResizeMode = ResizeMode.NoResize;
-        Surface.ShowInTaskbar = false;
+        _surface = new();
+        _surface.Name = $"Surface_{UniqueId}";
+        _surface.Width = _surface.Height = 1; // Will be set on loaded
+        _surface.WindowStyle = WindowStyle.None;
+        _surface.ResizeMode = ResizeMode.NoResize;
+        _surface.ShowInTaskbar = false;
 
-        Surface.Background = Player != null ? new SolidColorBrush(Player.Config.Video.BackgroundColor) : Brushes.Black;
+        _surface.Background = Player != null ? new SolidColorBrush(Player.Config.Video.BackgroundColor) : Brushes.Black;
 
         // When using ItemsControl with ObservableCollection<Player> to fill DataTemplates with TPGFlyleafHost EnsureHandle will call Host_loaded
         Loaded -= Host_Loaded;
-        SurfaceHandle = new WindowInteropHelper(Surface).EnsureHandle();
+        SurfaceHandle = new WindowInteropHelper(_surface).EnsureHandle();
         Loaded += Host_Loaded;
 
         unchecked
@@ -671,29 +701,25 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
 
         ReplicaPlayer?.renderer.SetChildHandle(SurfaceHandle);
 
-        Surface.Closed += Surface_Closed;
-        Surface.Closing += Surface_Closing;
-        Surface.KeyDown += Surface_KeyDown;
-        Surface.KeyUp += Surface_KeyUp;
-        Surface.Drop += Surface_Drop;
-        Surface.DragEnter += Surface_DragEnter;
-        Surface.SizeChanged += SetRectOverlay;
+        _surface.Closed += Surface_Closed;
+        _surface.KeyDown += Surface_KeyDown;
+        _surface.KeyUp += Surface_KeyUp;
+        _surface.Drop += Surface_Drop;
+        _surface.DragEnter += Surface_DragEnter;
+        _surface.SizeChanged += SetRectOverlay;
 
         SetMouseSurface();
 
-        Surface.AllowDrop = true;
-
-        if (IsLoaded && Owner == null && !fromSetOverlay)
-            Host_Loaded(null, null);
+        _surface.AllowDrop = true;
 
         SurfaceCreated?.Invoke(this, new());
     }
-    public virtual void SetOverlay()
+    private void CreateOverlay()
     {
-        if (_overlay == null)
+        if (_overlay != null)
             return;
 
-        SetSurface(true);
+        _overlay = new Window() { WindowStyle = WindowStyle.None, ResizeMode = ResizeMode.NoResize, AllowsTransparency = true };
 
         Loaded -= Host_Loaded;
         OverlayHandle = new WindowInteropHelper(_overlay).EnsureHandle();
@@ -702,13 +728,13 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         _overlay.Resources = Resources;
         _overlay.DataContext = DataContext;
 
-        SetWindowPos(OverlayHandle, nint.Zero, 0, 0, (int)Surface.ActualWidth, (int)Surface.ActualHeight,
+        SetWindowPos(OverlayHandle, nint.Zero, 0, 0, (int)_surface.ActualWidth, (int)_surface.ActualHeight,
                 (uint)(SetWindowPosFlags.SWP_NOZORDER | SetWindowPosFlags.SWP_NOACTIVATE));
 
         _overlay.Name = $"Overlay_{UniqueId}";
         _overlay.Background = Brushes.Transparent;
         _overlay.ShowInTaskbar = false;
-        _overlay.Owner = Surface;
+        _overlay.Owner = _surface;
         SetParent(OverlayHandle, SurfaceHandle);
         SetWindowLong(OverlayHandle, (int)WindowLongFlags.GWL_STYLE, NONE_STYLE | (nint)(WindowStyles.WS_CHILD | WindowStyles.WS_MAXIMIZE)); // TBR: WS_MAXIMIZE required? (possible better for DWM on fullscreen?)
 
@@ -721,13 +747,13 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         SetMouseOverlay();
 
         // Owner will close the overlay
-        _overlay.KeyDown += (o, e) => { if (e.Key == Key.System && e.SystemKey == Key.F4) Surface?.Focus(); };
+        _overlay.KeyDown += (o, e) => { if (e.Key == Key.System && e.SystemKey == Key.F4) _surface?.Focus(); };
 
         _overlay.AllowDrop = true;
 
         _overlay.Template = OverlayTemplate;
 
-        if (Surface.IsVisible)
+        if (_surface.IsVisible)
             _overlay.Show();
         else if (!_overlay.IsVisible)
         {
@@ -735,34 +761,31 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
             _overlay.Hide();
         }
 
-        if (IsLoaded && Owner == null)
-            Host_Loaded(null, null);
-
         OverlayCreated?.Invoke(this, new());
     }
     private void SetMouseSurface()
     {
-        if (Surface == null)
+        if (_surface == null)
             return;
 
         if (!_isMouseBindingsSubscribedSurface)
         {
-            Surface.LostMouseCapture += Surface_LostMouseCapture;
-            Surface.MouseLeftButtonDown += Surface_MouseLeftButtonDown;
-            Surface.MouseLeftButtonUp += Surface_MouseLeftButtonUp;
-            Surface.MouseWheel += Surface_MouseWheel;
-            Surface.MouseMove += Surface_MouseMove;
-            Surface.MouseLeave += Surface_MouseLeave;
+            _surface.LostMouseCapture += Surface_LostMouseCapture;
+            _surface.MouseLeftButtonDown += Surface_MouseLeftButtonDown;
+            _surface.MouseLeftButtonUp += Surface_MouseLeftButtonUp;
+            _surface.MouseWheel += Surface_MouseWheel;
+            _surface.MouseMove += Surface_MouseMove;
+            _surface.MouseLeave += Surface_MouseLeave;
             _isMouseBindingsSubscribedSurface = true;
         }
         else if (_isMouseBindingsSubscribedSurface)
         {
-            Surface.LostMouseCapture -= Surface_LostMouseCapture;
-            Surface.MouseLeftButtonDown -= Surface_MouseLeftButtonDown;
-            Surface.MouseLeftButtonUp -= Surface_MouseLeftButtonUp;
-            Surface.MouseWheel -= Surface_MouseWheel;
-            Surface.MouseMove -= Surface_MouseMove;
-            Surface.MouseLeave -= Surface_MouseLeave;
+            _surface.LostMouseCapture -= Surface_LostMouseCapture;
+            _surface.MouseLeftButtonDown -= Surface_MouseLeftButtonDown;
+            _surface.MouseLeftButtonUp -= Surface_MouseLeftButtonUp;
+            _surface.MouseWheel -= Surface_MouseWheel;
+            _surface.MouseMove -= Surface_MouseMove;
+            _surface.MouseLeave -= Surface_MouseLeave;
             _isMouseBindingsSubscribedSurface = false;
         }
     }
@@ -795,20 +818,20 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
 
     public virtual void Attach()
     {
-        Window wasFocus = _overlay != null && _overlay.IsKeyboardFocusWithin ? _overlay : Surface;
+        Window wasFocus = _overlay != null && _overlay.IsKeyboardFocusWithin ? _overlay : _surface;
 
-        Surface.Topmost = false;
-        Surface.MinWidth = MinWidth;
-        Surface.MinHeight = MinHeight;
-        Surface.MaxWidth = MaxWidth;
-        Surface.MaxHeight = MaxHeight;
+        _surface.Topmost = false;
+        _surface.MinWidth = MinWidth;
+        _surface.MinHeight = MinHeight;
+        _surface.MaxWidth = MaxWidth;
+        _surface.MaxHeight = MaxHeight;
 
         unchecked
         {
             // aka: Changed WS_CHILD to WS_POPUP because it made the main window flicker when style was not set to None and transparent (we cannot do this becuase it overlaps the taskbar)
             SetWindowLong(SurfaceHandle, (int)WindowLongFlags.GWL_STYLE, NONE_STYLE | (nint)WindowStyles.WS_POPUP);
         }
-        Surface.Owner = Owner;
+        _surface.Owner = Owner;
         SetParent(SurfaceHandle, OwnerHandle);
 
         _rectInitLast = _rectIntersectLast = rectRandom;
@@ -826,7 +849,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
     private void SetRectOverlay(object sender, SizeChangedEventArgs e)
     {
         if (_overlay != null)
-            SetWindowPos(OverlayHandle, nint.Zero, 0, 0, (int)Math.Round(Surface.ActualWidth * DpiX), (int)Math.Round(Surface.ActualHeight * DpiY),
+            SetWindowPos(OverlayHandle, nint.Zero, 0, 0, (int)Math.Round(_surface.ActualWidth * DpiX), (int)Math.Round(_surface.ActualHeight * DpiY),
                 (uint)(SetWindowPosFlags.SWP_NOZORDER | SetWindowPosFlags.SWP_NOMOVE | SetWindowPosFlags.SWP_NOACTIVATE));
     }
 
@@ -845,91 +868,16 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
 
     public Point? GetVideoFramePoint()
     {
-        if (Surface is null || Player is null)
+        if (_surface is null || Player is null)
             return null;
 
-        Point mousePos = Mouse.GetPosition(Surface);
+        Point mousePos = Mouse.GetPosition(_surface);
         var viewport = Player.renderer.GetViewport;
 
         return new Point((mousePos.X - viewport.X) / viewport.Width, (mousePos.Y - viewport.Y) / viewport.Height);
     }
 
-    /// <summary>
-    /// Disposes the Surface and Overlay Windows and de-assigns the Player
-    /// </summary>
-    public void Dispose()
-    {
-        lock (this)
-        {
-            if (Disposed)
-                return;
-
-            // Disposes SwapChain Only
-            Player = null;
-            ReplicaPlayer = null;
-            Disposed = true;
-
-            DataContextChanged -= Host_DataContextChanged;
-            IsVisibleChanged -= Host_IsVisibleChanged;
-            Loaded -= Host_Loaded;
-
-            if (_overlay != null)
-            {
-                if (_isMouseBindingsSubscribedOverlay)
-                    SetMouseOverlay();
-
-                _overlay.IsVisibleChanged -= OverlayStandAlone_IsVisibleChanged;
-                _overlay.KeyUp -= Overlay_KeyUp;
-                _overlay.KeyDown -= Overlay_KeyDown;
-                _overlay.Closed -= Overlay_Closed;
-                _overlay.Drop -= Overlay_Drop;
-                _overlay.DragEnter -= Overlay_DragEnter;
-            }
-
-            if (Surface != null)
-            {
-                if (_isMouseBindingsSubscribedSurface)
-                    SetMouseSurface();
-
-                Surface.Closed -= Surface_Closed;
-                Surface.Closing -= Surface_Closing;
-                Surface.KeyDown -= Surface_KeyDown;
-                Surface.KeyUp -= Surface_KeyUp;
-                Surface.Drop -= Surface_Drop;
-                Surface.DragEnter -= Surface_DragEnter;
-                Surface.SizeChanged -= SetRectOverlay;
-
-                // If not shown yet app will not close properly
-                if (!_surfaceClosed)
-                {
-                    Surface.Owner = null;
-                    SetParent(SurfaceHandle, nint.Zero);
-                    Surface.Width = Surface.Height = 1;
-                    Surface.Show();
-                    if (!_overlayClosed)
-                        _overlay?.Show();
-                    Surface.Close();
-                }
-            }
-
-            if (Owner != null)
-            {
-                Owner.SizeChanged -= Owner_SizeChanged;
-            }
-
-            Surface = null;
-            _overlay = null;
-            Owner = null;
-
-            SurfaceHandle = nint.Zero;
-            OverlayHandle = nint.Zero;
-            OwnerHandle = nint.Zero;
-
-            Log.Debug("Disposed");
-        }
-    }
-
-    public bool Player_CanHideCursor() => Surface != null && Surface.IsActive || _overlay != null && _overlay.IsActive;
+    public bool Player_CanHideCursor() => _surface != null && _surface.IsActive || _overlay != null && _overlay.IsActive;
     public bool Player_GetFullScreen() => false;
     public void Player_SetFullScreen(bool value)
     {
