@@ -45,7 +45,6 @@ public class SimpleHost : ContentControl, IHostPlayer
     private bool _isMouseBindingsSubscribedSurface;
     private bool _isMouseBindingsSubscribedOverlay;
 
-    private CornerRadius _zeroCornerRadius = new(0);
     private Point _zeroPoint = new(0, 0);
     private Point _mouseLeftDownPoint = new(0, 0);
     private Point _mouseMoveLastPoint = new(0, 0);
@@ -96,14 +95,6 @@ public class SimpleHost : ContentControl, IHostPlayer
     public static readonly DependencyProperty PlayerProperty =
         DependencyProperty.Register(nameof(Player), typeof(Player), typeof(SimpleHost), new PropertyMetadata(null, OnPlayerChanged));
 
-    public Player ReplicaPlayer
-    {
-        get => (Player)GetValue(ReplicaPlayerProperty);
-        set => SetValue(ReplicaPlayerProperty, value);
-    }
-    public static readonly DependencyProperty ReplicaPlayerProperty =
-        DependencyProperty.Register(nameof(ReplicaPlayer), typeof(Player), typeof(SimpleHost), new PropertyMetadata(null, OnReplicaPlayerChanged));
-
     public ControlTemplate OverlayTemplate
     {
         get => (ControlTemplate)GetValue(OverlayTemplateProperty);
@@ -125,17 +116,6 @@ public class SimpleHost : ContentControl, IHostPlayer
             return;
 
         host.SetPlayer((Player)e.OldValue);
-    }
-    private static void OnReplicaPlayerChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-    {
-        if (isDesginMode)
-            return;
-
-        SimpleHost host = d as SimpleHost;
-        if (!host.IsLoaded)
-            return;
-
-        host.SetReplicaPlayer((Player)e.OldValue);
     }
     private static void OnActivityTimeoutChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
@@ -185,11 +165,6 @@ public class SimpleHost : ContentControl, IHostPlayer
         {
             Player?.renderer.DisposeSwapChain();
             Player.Host = this;
-        }
-        if (ReplicaPlayer is not null)
-        {
-            ReplicaPlayer?.renderer.DisposeSwapChain();
-            ReplicaPlayer.Host = this;
         }
 
         if (_overlay != null)
@@ -622,19 +597,6 @@ public class SimpleHost : ContentControl, IHostPlayer
 
     #region Methods
 
-    public virtual void SetReplicaPlayer(Player oldPlayer)
-    {
-        if (oldPlayer != null)
-        {
-            oldPlayer.renderer.SetChildHandle(nint.Zero);
-        }
-
-        if (ReplicaPlayer == null)
-            return;
-
-        if (_surface != null)
-            ReplicaPlayer.renderer.SetChildHandle(SurfaceHandle);
-    }
     public virtual void SetPlayer(Player oldPlayer)
     {
         // De-assign old Player's Handle/TPGFlyleafHost
@@ -698,8 +660,6 @@ public class SimpleHost : ContentControl, IHostPlayer
         SetWindowLong(SurfaceHandle, (int)WindowLongFlags.GWL_EXSTYLE, (nint)WindowStylesEx.WS_EX_LAYERED);
 
         Player?.VideoDecoder.CreateSwapChain(SurfaceHandle);
-
-        ReplicaPlayer?.renderer.SetChildHandle(SurfaceHandle);
 
         _surface.Closed += Surface_Closed;
         _surface.KeyDown += Surface_KeyDown;
