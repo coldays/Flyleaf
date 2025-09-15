@@ -776,7 +776,7 @@ public class SimpleHost : ContentControl, IHostPlayer
         }
     }
 
-    public virtual void Attach()
+    private void Attach()
     {
         Window wasFocus = _overlay != null && _overlay.IsKeyboardFocusWithin ? _overlay : _surface;
 
@@ -841,7 +841,6 @@ public class SimpleHost : ContentControl, IHostPlayer
     public bool Player_GetFullScreen() => false;
     public void Player_SetFullScreen(bool value)
     {
-
     }
     public void Player_Disposed() => UIInvokeIfRequired(() => Player = null);
     #endregion
