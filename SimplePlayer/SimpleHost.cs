@@ -549,20 +549,6 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         if (!_surfaceClosing)
             _surface?.Close();
     }
-    private void OverlayStandAlone_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
-    {
-        // Surface should be visible first (this happens only on initialization of standalone)
-
-        if (_surface.IsVisible)
-            return;
-
-        if (_overlay.IsVisible)
-        {
-            _surface.Show();
-            ShowWindow(OverlayHandle, (int)ShowWindowCommands.SW_SHOWMINIMIZED);
-            ShowWindow(OverlayHandle, (int)ShowWindowCommands.SW_SHOWMAXIMIZED);
-        }
-    }
     #endregion
 
     #region Constructors
@@ -874,7 +860,6 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
                 if (_isMouseBindingsSubscribedOverlay)
                     SetMouseOverlay();
 
-                _overlay.IsVisibleChanged -= OverlayStandAlone_IsVisibleChanged;
                 _overlay.KeyUp -= Overlay_KeyUp;
                 _overlay.KeyDown -= Overlay_KeyDown;
                 _overlay.Closed -= Overlay_Closed;
