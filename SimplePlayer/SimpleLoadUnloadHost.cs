@@ -328,7 +328,7 @@ public class SimpleLoadUnloadHost : ContentControl, IHostPlayer
     }
     private void RecalcRect()
     {
-        // Finds Rect Intersect with TPGFlyleafHost's parents and Clips Surface/Overlay (eg. within ScrollViewer)
+        // Finds Rect Intersect with SimpleLoadUnloadHost's parents and Clips Surface/Overlay (eg. within ScrollViewer)
         // TBR: Option not to clip rect or stop at first/second parent?
         // For performance should focus only on ScrollViewer if any and Owner Window (other sources that clip our host?)
 
@@ -377,7 +377,7 @@ public class SimpleLoadUnloadHost : ContentControl, IHostPlayer
         }
         catch (Exception ex)
         {
-            // It has been noticed with NavigationService (The visual tree changes, visual root IsVisible is false but TPGFlyleafHost is still visible)
+            // It has been noticed with NavigationService (The visual tree changes, visual root IsVisible is false but SimpleLoadUnloadHost is still visible)
             if (Logger.CanDebug)
                 Log.Debug($"Host_LayoutUpdated: {ex.Message}");
 
@@ -583,7 +583,7 @@ public class SimpleLoadUnloadHost : ContentControl, IHostPlayer
         if (isDesginMode)
             return;
 
-        Log = new LogHandler(("[#" + UniqueId + "]").PadRight(8, ' ') + $" [TPGFlyleafHost NP] ");
+        Log = new LogHandler(("[#" + UniqueId + "]").PadRight(8, ' ') + $" [SimpleLoadUnloadHost NP] ");
         Loaded += Host_Loaded;
         Unloaded += SimpleLoadUnloadHost_Unloaded;
         DataContextChanged += Host_DataContextChanged;
@@ -599,7 +599,7 @@ public class SimpleLoadUnloadHost : ContentControl, IHostPlayer
 
     public virtual void SetPlayer(Player oldPlayer)
     {
-        // De-assign old Player's Handle/TPGFlyleafHost
+        // De-assign old Player's Handle/SimpleLoadUnloadHost
         if (oldPlayer != null)
         {
             Log.Debug($"De-assign Player #{oldPlayer.PlayerId}");
@@ -611,15 +611,15 @@ public class SimpleLoadUnloadHost : ContentControl, IHostPlayer
         if (Player == null)
             return;
 
-        Log.Prefix = ("[#" + UniqueId + "]").PadRight(8, ' ') + $" [TPGFlyleafHost #{Player.PlayerId}] ";
+        Log.Prefix = ("[#" + UniqueId + "]").PadRight(8, ' ') + $" [SimpleLoadUnloadHost #{Player.PlayerId}] ";
 
-        // De-assign new Player's Handle/TPGFlyleafHost
+        // De-assign new Player's Handle/SimpleLoadUnloadHost
         Player.Host?.Player_Disposed();
 
         if (Player == null) // We might just de-assign our Player
             return;
 
-        // Assign new Player's (Handle/TPGFlyleafHost)
+        // Assign new Player's (Handle/SimpleLoadUnloadHost)
         Log.Debug($"Assign Player #{Player.PlayerId}");
 
         Player.Host = this;
@@ -647,7 +647,7 @@ public class SimpleLoadUnloadHost : ContentControl, IHostPlayer
 
         _surface.Background = Player != null ? new SolidColorBrush(Player.Config.Video.BackgroundColor) : Brushes.Black;
 
-        // When using ItemsControl with ObservableCollection<Player> to fill DataTemplates with TPGFlyleafHost EnsureHandle will call Host_loaded
+        // When using ItemsControl with ObservableCollection<Player> to fill DataTemplates with SimpleLoadUnloadHost EnsureHandle will call Host_loaded
         Loaded -= Host_Loaded;
         SurfaceHandle = new WindowInteropHelper(_surface).EnsureHandle();
         Loaded += Host_Loaded;

@@ -255,9 +255,9 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
     private void Host_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
         // TBR
-        // 1. this.DataContext: TPGFlyleafHost's DataContext will not be affected (Inheritance)
-        // 2. Overlay.DataContext: Overlay's DataContext will be TPGFlyleafHost itself
-        // 3. Overlay.DataContext.HostDataContext: TPGFlyleafHost's DataContext includes HostDataContext to access TPGFlyleafHost's DataContext
+        // 1. this.DataContext: SimpleHost's DataContext will not be affected (Inheritance)
+        // 2. Overlay.DataContext: Overlay's DataContext will be SimpleHost itself
+        // 3. Overlay.DataContext.HostDataContext: SimpleHost's DataContext includes HostDataContext to access SimpleHost's DataContext
         // 4. In case of Stand Alone will let the user to decide
         _overlay.DataContext = DataContext;
     }
@@ -316,7 +316,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
     }
     private void RecalcRect()
     {
-        // Finds Rect Intersect with TPGFlyleafHost's parents and Clips Surface/Overlay (eg. within ScrollViewer)
+        // Finds Rect Intersect with SimpleHost's parents and Clips Surface/Overlay (eg. within ScrollViewer)
         // TBR: Option not to clip rect or stop at first/second parent?
         // For performance should focus only on ScrollViewer if any and Owner Window (other sources that clip our host?)
 
@@ -365,7 +365,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         }
         catch (Exception ex)
         {
-            // It has been noticed with NavigationService (The visual tree changes, visual root IsVisible is false but TPGFlyleafHost is still visible)
+            // It has been noticed with NavigationService (The visual tree changes, visual root IsVisible is false but SimpleHost is still visible)
             if (Logger.CanDebug)
                 Log.Debug($"Host_LayoutUpdated: {ex.Message}");
 
@@ -564,7 +564,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         if (isDesginMode)
             return;
 
-        Log = new LogHandler(("[#" + UniqueId + "]").PadRight(8, ' ') + $" [TPGFlyleafHost NP] ");
+        Log = new LogHandler(("[#" + UniqueId + "]").PadRight(8, ' ') + $" [SimpleHost NP] ");
         Loaded += Host_Loaded;
     }
     #endregion
@@ -573,7 +573,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
 
     public virtual void SetPlayer(Player oldPlayer)
     {
-        // De-assign old Player's Handle/TPGFlyleafHost
+        // De-assign old Player's Handle/SimpleHost
         if (oldPlayer != null)
         {
             Log.Debug($"De-assign Player #{oldPlayer.PlayerId}");
@@ -585,15 +585,15 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         if (Player == null)
             return;
 
-        Log.Prefix = ("[#" + UniqueId + "]").PadRight(8, ' ') + $" [TPGFlyleafHost #{Player.PlayerId}] ";
+        Log.Prefix = ("[#" + UniqueId + "]").PadRight(8, ' ') + $" [SimpleHost #{Player.PlayerId}] ";
 
-        // De-assign new Player's Handle/TPGFlyleafHost
+        // De-assign new Player's Handle/SimpleHost
         Player.Host?.Player_Disposed();
 
         if (Player == null) // We might just de-assign our Player
             return;
 
-        // Assign new Player's (Handle/TPGFlyleafHost)
+        // Assign new Player's (Handle/SimpleHost)
         Log.Debug($"Assign Player #{Player.PlayerId}");
 
         Player.Host = this;
@@ -621,7 +621,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
 
         _surface.Background = Player != null ? new SolidColorBrush(Player.Config.Video.BackgroundColor) : Brushes.Black;
 
-        // When using ItemsControl with ObservableCollection<Player> to fill DataTemplates with TPGFlyleafHost EnsureHandle will call Host_loaded
+        // When using ItemsControl with ObservableCollection<Player> to fill DataTemplates with SimpleHost EnsureHandle will call Host_loaded
         Loaded -= Host_Loaded;
         SurfaceHandle = new WindowInteropHelper(_surface).EnsureHandle();
         Loaded += Host_Loaded;
