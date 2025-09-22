@@ -44,7 +44,7 @@ public class AudioEngine : CallbackBase, IMMNotificationClient, INotifyPropertyC
 
     public event PropertyChangedEventHandler PropertyChanged;
 
-    public AudioEngine()
+    public AudioEngine() // We consider from UI here
     {
         if (Engine.Config.DisableAudio)
         {
@@ -65,7 +65,7 @@ public class AudioEngine : CallbackBase, IMMNotificationClient, INotifyPropertyC
 
             var devices = MediaFactory.MFEnumAudioDeviceSources();
                 foreach (var device in devices)
-                    try { Engine.Audio.CapDevices.Add(new AudioDevice(device.FriendlyName, device.SymbolicLink)); } catch(Exception) { }
+                    try { Engine.Audio.CapDevices.Add(new(device.FriendlyName, device.SymbolicLink)); } catch(Exception) { }
         }
     }
 
@@ -166,7 +166,7 @@ public class AudioEngine : CallbackBase, IMMNotificationClient, INotifyPropertyC
                 {
                     CurrentDevice.Id    = defaultDevice.Id;
                     CurrentDevice.Name  = defaultDevice.FriendlyName;
-                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CurrentDevice)));
+                    PropertyChanged?.Invoke(this, new(nameof(CurrentDevice)));
                 }
 
                 // Fall back to DefaultDevice *Non-UI thread otherwise will freeze (not sure where and why) during xaudio.Dispose()

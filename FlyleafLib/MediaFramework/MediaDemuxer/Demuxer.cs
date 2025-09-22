@@ -526,7 +526,8 @@ public unsafe class Demuxer : RunThreadBase
             if (fmtCtx->pb != null)
                 fmtCtx->pb->eof_reached = 0;
 
-            FillInfo();
+            lock (lockStreams)
+                FillInfo();
 
             if (Type == MediaType.Video && VideoStreams.Count == 0 && AudioStreams.Count == 0)
                 return error = $"No audio / video stream found";
@@ -682,66 +683,63 @@ public unsafe class Demuxer : RunThreadBase
         bool subsHasEng = false;
         AVStreamToStream= [];
 
-        lock (lockStreams)
+        for (int i = 0; i < fmtCtx->nb_streams; i++)
         {
-            for (int i = 0; i < fmtCtx->nb_streams; i++)
+            var stream = fmtCtx->streams[i];
+            stream->discard = AVDiscard.AVDISCARD_ALL;
+            if (stream->codecpar->codec_id == AVCodecID.AV_CODEC_ID_NONE)
             {
-                var stream = fmtCtx->streams[i];
-                stream->discard = AVDiscard.AVDISCARD_ALL;
-                if (stream->codecpar->codec_id == AVCodecID.AV_CODEC_ID_NONE)
-                {
-                    AVStreamToStream.Add(stream->index, new MiscStream(this, stream));
-                    Log.Info($"#[Invalid #{i}] No codec");
-                    continue;
-                }
+                AVStreamToStream.Add(stream->index, new MiscStream(this, stream));
+                Log.Info($"#[Invalid #{i}] No codec");
+                continue;
+            }
 
-                switch (stream->codecpar->codec_type)
-                {
-                    case AVMediaType.AVMEDIA_TYPE_AUDIO:
-                        AudioStreams.Add(new(this, stream));
-                        AVStreamToStream.Add(stream->index, AudioStreams[^1]);
-                        audioHasEng = AudioStreams[^1].Language == Language.English;
+            switch (stream->codecpar->codec_type)
+            {
+                case AVMediaType.AVMEDIA_TYPE_AUDIO:
+                    AudioStreams.Add(new(this, stream));
+                    AVStreamToStream.Add(stream->index, AudioStreams[^1]);
+                    audioHasEng = AudioStreams[^1].Language == Language.English;
 
-                        break;
+                    break;
 
-                    case AVMediaType.AVMEDIA_TYPE_VIDEO:
-                        if ((stream->disposition & AV_DISPOSITION_ATTACHED_PIC) != 0)
-                        {
-                            AVStreamToStream.Add(stream->index, new MiscStream(this, stream));
-                            Log.Info($"Excluding image stream #{i}");
-                        }
-
-                        // TBR: When AllowFindStreamInfo = false we can get valid pixel format during decoding (in case of remuxing only this might crash, possible check if usedecoders?)
-                        else if (((AVPixelFormat)stream->codecpar->format) == AVPixelFormat.AV_PIX_FMT_NONE && Config.AllowFindStreamInfo)
-                        {
-                            AVStreamToStream.Add(stream->index, new MiscStream(this, stream));
-                            Log.Info($"Excluding invalid video stream #{i}");
-                        }
-                        else
-                        {
-                            VideoStreams.Add(new(this, stream));
-                            AVStreamToStream.Add(stream->index, VideoStreams[^1]);
-                        }
-                        
-                        break;
-
-                    case AVMediaType.AVMEDIA_TYPE_SUBTITLE:
-                        SubtitlesStreams.Add(new SubtitlesStream(this, fmtCtx->streams[i]));
-                        AVStreamToStream.Add(fmtCtx->streams[i]->index, SubtitlesStreams[^1]);
-                        subsHasEng = SubtitlesStreams[^1].Language == Language.English;
-                        break;
-
-                    case AVMediaType.AVMEDIA_TYPE_DATA:
-                        DataStreams.Add(new DataStream(this, fmtCtx->streams[i]));
-                        AVStreamToStream.Add(fmtCtx->streams[i]->index, DataStreams[^1]);
-
-                        break;
-
-                    default:
+                case AVMediaType.AVMEDIA_TYPE_VIDEO:
+                    if ((stream->disposition & AV_DISPOSITION_ATTACHED_PIC) != 0)
+                    {
                         AVStreamToStream.Add(stream->index, new MiscStream(this, stream));
-                        Log.Info($"#[Unknown #{i}] {stream->codecpar->codec_type}");
-                        break;
-                }
+                        Log.Info($"Excluding image stream #{i}");
+                    }
+
+                    // TBR: When AllowFindStreamInfo = false we can get valid pixel format during decoding (in case of remuxing only this might crash, possible check if usedecoders?)
+                    else if (((AVPixelFormat)stream->codecpar->format) == AVPixelFormat.AV_PIX_FMT_NONE && Config.AllowFindStreamInfo)
+                    {
+                        AVStreamToStream.Add(stream->index, new MiscStream(this, stream));
+                        Log.Info($"Excluding invalid video stream #{i}");
+                    }
+                    else
+                    {
+                        VideoStreams.Add(new(this, stream));
+                        AVStreamToStream.Add(stream->index, VideoStreams[^1]);
+                    }
+                        
+                    break;
+
+                case AVMediaType.AVMEDIA_TYPE_SUBTITLE:
+                    SubtitlesStreams.Add(new(this, stream));
+                    AVStreamToStream.Add(stream->index, SubtitlesStreams[^1]);
+                    subsHasEng = SubtitlesStreams[^1].Language == Language.English;
+                    break;
+
+                case AVMediaType.AVMEDIA_TYPE_DATA:
+                    DataStreams.Add(new(this, stream));
+                    AVStreamToStream.Add(stream->index, DataStreams[^1]);
+
+                    break;
+
+                default:
+                    AVStreamToStream.Add(stream->index, new MiscStream(this, stream));
+                    Log.Info($"#[Unknown #{i}] {stream->codecpar->codec_type}");
+                    break;
             }
         }
 

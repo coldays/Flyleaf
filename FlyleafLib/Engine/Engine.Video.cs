@@ -31,7 +31,7 @@ public class VideoEngine
 
     private readonly object lockCapDevices = new();
 
-    internal VideoEngine()
+    internal VideoEngine() // We consider from UI here
     {
         if (DXGI.CreateDXGIFactory1(out Factory).Failure)
             throw new InvalidOperationException("Cannot create IDXGIFactory1");
@@ -48,7 +48,7 @@ public class VideoEngine
 
             var devices = MediaFactory.MFEnumVideoDeviceSources();
                 foreach (var device in devices)
-                try { Engine.Video.CapDevices.Add(new VideoDevice(device.FriendlyName, device.SymbolicLink)); } catch(Exception) { }
+                try { Engine.Video.CapDevices.Add(new(device.FriendlyName, device.SymbolicLink)); } catch(Exception) { }
         }
     }
 

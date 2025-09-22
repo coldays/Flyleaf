@@ -693,7 +693,7 @@ public class Config : NotifyPropertyChanged
         /// <summary>
         /// Custom max vertical resolution that will be used from the input/stream suggester plugins
         /// </summary>
-        public int              MaxVerticalResolutionCustom { get => _MaxVerticalResolutionCustom; set => Set(ref _MaxVerticalResolutionCustom, value); }
+        public int              MaxVerticalResolutionCustom { get => _MaxVerticalResolutionCustom;  set => Set(ref _MaxVerticalResolutionCustom, value); }
         int _MaxVerticalResolutionCustom;
 
         /// <summary>
@@ -704,6 +704,12 @@ public class Config : NotifyPropertyChanged
         [JsonIgnore]
 #endif
         public int              MaxVerticalResolution       => MaxVerticalResolutionCustom == 0 ? (MaxVerticalResolutionAuto != 0 ? MaxVerticalResolutionAuto : 1080) : MaxVerticalResolutionCustom;
+
+        /// <summary>
+        /// Sets NVidia Super Resolution (experimental)
+        /// </summary>
+        public bool             NVidiaSuperResolution       { get => _NVidiaSuperResolution;        set { Set(ref _NVidiaSuperResolution, value); player?.renderer?.UpdateNVidiaSuperRes(value); } }
+        internal bool _NVidiaSuperResolution;
 
         /// <summary>
         /// In case of no hardware accelerated or post process accelerated pixel formats will use FFmpeg's SwsScale

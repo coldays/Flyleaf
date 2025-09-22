@@ -42,7 +42,7 @@ public static class Engine
     /// <summary>
     /// List of active Players
     /// </summary>
-    public static List<Player>      Players         { get; private set; }
+    public static List<Player>      Players         { get; private set; } = [];
 
     public static event EventHandler
                     Loaded;
@@ -103,25 +103,28 @@ public static class Engine
 
     private static void StartInternal(EngineConfig config = null, bool async = false)
     {
-        lock (lockEngine)
+        if (Application.Current == null)
+            _ = new Application();
+
+        UIInvokeIfRequired(() =>
         {
-            if (isLoading)
-                return;
+            lock (lockEngine)
+            {
+                if (isLoading)
+                    return;
 
-            isLoading = true;
+                isLoading = true;
 
-            Config = config ?? new EngineConfig();
+                Config = config ?? new EngineConfig();
 
-            if (Application.Current == null)
-                _ = new Application();
+                StartInternalUI();
 
-            StartInternalUI();
-
-            if (async)
-                Task.Run(() => StartInternalNonUI());
-            else
-                StartInternalNonUI();
-        }
+                if (async)
+                    Task.Run(() => StartInternalNonUI());
+                else
+                    StartInternalNonUI();
+            }
+        });
     }
 
     private static void StartInternalUI()
@@ -138,6 +141,7 @@ public static class Engine
         SetOutput();
         Log     = new("[FlyleafEngine] ");
         Audio   = new();
+        Video   = new();
     }
 
     private static void StartInternalNonUI()
@@ -146,10 +150,7 @@ public static class Engine
         Log.Info($"FlyleafLib {version.Major }.{version.Minor}.{version.Build}");
 
         FFmpeg  = new();
-        Video   = new();
         Plugins = new();
-        Players = [];
-
         IsLoaded= true;
 
         //if (Config.FFmpegLoadProfile == LoadProfile.All) // Cap Devices (TBR: if UI required)
