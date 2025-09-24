@@ -75,7 +75,8 @@ public unsafe class VideoStream : StreamBase
         else
         {
             FPS = av_q2d(av_guess_frame_rate(Demuxer.FormatContext, AVStream, null));
-            if (double.IsNaN(FPS) || double.IsInfinity(FPS) || FPS < 0.0)
+            // Sanity check of fps, if wrong framerate is guessed, then video won't play correctly
+            if (double.IsNaN(FPS) || double.IsInfinity(FPS) || FPS < 0.0 || FPS > 200)
                 FPS = 0.0;
         }
 
