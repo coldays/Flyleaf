@@ -278,7 +278,7 @@ public unsafe class VideoStream : StreamBase
         if (FPS == 0.0)
         {
             var newFps      = av_q2d(codecCtx->framerate);
-            FPS             = double.IsNaN(newFps) || double.IsInfinity(newFps) || newFps <= 0.0 ? 25 : newFps; // Force default to 25 fps
+            FPS             = double.IsNaN(newFps) || double.IsInfinity(newFps) || newFps <= 0.0 || newFps > 200 ? 25 : newFps; // Force default to 25 fps
             FrameDuration   = (long)(10_000_000 / FPS);
             TotalFrames     = (int)(Duration / FrameDuration);
             Demuxer.VideoPackets.frameDuration = FrameDuration;
