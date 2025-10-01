@@ -37,7 +37,7 @@ public unsafe class VideoStream : StreamBase
     public string                       PixelFormatStr      { get; set; }
     public int                          PixelPlanes         { get; set; }
     public bool                         PixelInterleaved    { get; set; }
-    public int                          TotalFrames         { get; set; }
+    public long                         TotalFrames         { get; set; }
     public uint                         Width               { get; set; }
     public bool                         FixTimestamps       { get; set; }
     
@@ -63,9 +63,10 @@ public unsafe class VideoStream : StreamBase
         if (PixelFormat != AVPixelFormat.AV_PIX_FMT_NONE)
             AnalysePixelFormat();
 
-        Width   = (uint)cp->width;
-        Height  = (uint)cp->height;
-        SAR     = av_guess_sample_aspect_ratio(null, AVStream, null);
+        Width       = (uint)cp->width;
+        Height      = (uint)cp->height;
+        SAR         = av_guess_sample_aspect_ratio(null, AVStream, null);
+        TotalFrames = AVStream->nb_frames;
 
         if ((Demuxer.FormatContext->iformat->flags & AVFMT_NOTIMESTAMPS) != 0)
             FixTimestamps = true;
@@ -81,10 +82,7 @@ public unsafe class VideoStream : StreamBase
         }
 
         if (FPS > 0)
-        {
-            FrameDuration   = (long)(10_000_000 / FPS);
-            TotalFrames     = (int)(Duration / FrameDuration);
-        }
+            FrameDuration = (long)(10_000_000 / FPS);
 
         FieldOrder      = cp->field_order == AVFieldOrder.AV_FIELD_TT ? VideoFrameFormat.InterlacedTopFieldFirst : (cp->field_order == AVFieldOrder.AV_FIELD_BB ? VideoFrameFormat.InterlacedBottomFieldFirst : VideoFrameFormat.Progressive);
         ColorTransfer   = cp->color_trc;
@@ -125,6 +123,14 @@ public unsafe class VideoStream : StreamBase
 
             hasStreamCrop = cropStreamRect != CropRect.Empty;
         }
+    }
+
+    internal override void UpdateDuration()
+    {
+        base.UpdateDuration();
+
+        if (AVStream->nb_frames < 1 && FrameDuration > 0)
+            TotalFrames = Duration / FrameDuration;
     }
 
     // >= Second time fill from Decoder / Frame | TBR: We could avoid re-filling it when re-enabling a stream ... when same PixelFormat (VideoAcceleration)
@@ -275,13 +281,11 @@ public unsafe class VideoStream : StreamBase
         }
         
         // We consider that FPS can't change (only if it was missing we fill it)
-        if (FPS == 0.0)
+        if (FPS == 0)
         {
             var newFps      = av_q2d(codecCtx->framerate);
             FPS             = double.IsNaN(newFps) || double.IsInfinity(newFps) || newFps <= 0.0 || newFps > 200 ? 25 : newFps; // Force default to 25 fps
             FrameDuration   = (long)(10_000_000 / FPS);
-            TotalFrames     = (int)(Duration / FrameDuration);
-            Demuxer.VideoPackets.frameDuration = FrameDuration;
         }
 
         // FPS2 / FrameDuration2 (DeInterlace)
@@ -297,6 +301,11 @@ public unsafe class VideoStream : StreamBase
             FPS2 = FPS * 2;
             FrameDuration2 = FrameDuration / 2;
         }
+
+        if (AVStream->nb_frames < 1)
+            TotalFrames = Duration / FrameDuration;
+
+        Demuxer.VideoPackets.frameDuration = FrameDuration;
 
         var rotData = av_frame_get_side_data(frame, AVFrameSideDataType.AV_FRAME_DATA_DISPLAYMATRIX);
         if (rotData != null && rotData->data != null)

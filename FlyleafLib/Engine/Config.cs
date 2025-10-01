@@ -220,6 +220,12 @@ public class Config : NotifyPropertyChanged
         public double   IdleFps                     { get; set; } = 60.0;
 
         /// <summary>
+        /// Zero Latency forces playback at the very last frame received (Live Video Only)
+        /// </summary>
+        public bool     ZeroLatency                 { get => _ZeroLatency; set { Set(ref _ZeroLatency, value); if (config != null) config.Decoder.LowDelay = value; if (player != null && player.IsPlaying) { player.Pause(); player.Play(); } } }
+        bool _ZeroLatency;
+
+        /// <summary>
         /// Max Latency (ticks) forces playback (with speed x1+) to stay at the end of the live network stream (default: 0 - disabled)
         /// </summary>
         public long     MaxLatency {
@@ -706,15 +712,16 @@ public class Config : NotifyPropertyChanged
         public int              MaxVerticalResolution       => MaxVerticalResolutionCustom == 0 ? (MaxVerticalResolutionAuto != 0 ? MaxVerticalResolutionAuto : 1080) : MaxVerticalResolutionCustom;
 
         /// <summary>
-        /// Sets NVidia Super Resolution (experimental)
+        /// Sets Nvidia Super Resolution (D3D11VP only)
         /// </summary>
-        public bool             NVidiaSuperResolution       { get => _NVidiaSuperResolution;        set { Set(ref _NVidiaSuperResolution, value); player?.renderer?.UpdateNVidiaSuperRes(value); } }
-        internal bool _NVidiaSuperResolution;
+        public bool             SuperResolutionNvidia       { get => _SuperResolutionNvidia;        set { Set(ref _SuperResolutionNvidia, value); player?.renderer?.UpdateSuperResNvidia(value); } }
+        internal bool _SuperResolutionNvidia;
 
         /// <summary>
-        /// In case of no hardware accelerated or post process accelerated pixel formats will use FFmpeg's SwsScale
+        /// Sets Intel Super Resolution (D3D11VP only)
         /// </summary>
-        public bool             SwsHighQuality              { get; set; } = false;
+        public bool             SuperResolutionIntel        { get => _SuperResolutionIntel;         set { Set(ref _SuperResolutionIntel, value); player?.renderer?.UpdateSuperResIntel(value); } }
+        internal bool _SuperResolutionIntel;
 
         /// <summary>
         /// Forces SwsScale instead of FlyleafVP for non HW decoded frames
@@ -728,11 +735,8 @@ public class Config : NotifyPropertyChanged
 
         /// <summary>
         /// Whether to use embedded video processor with custom pixel shaders or D3D11<br/>
-        /// (Currently D3D11 works only on video accelerated / hardware surfaces)<br/>
-        /// * FLVP supports HDR to SDR, D3D11 does not<br/>
-        /// * FLVP supports Pan Move/Zoom, D3D11 does not<br/>
-        /// * D3D11 possible performs better with color conversion and filters, FLVP supports only brightness/contrast filters<br/>
-        /// * D3D11 supports deinterlace (bob)
+        /// * FLVP supports HDR to SDR, hardware/software frames and more formats<br/>
+        /// * D3D11 uses less power, supports only hardware frames, deinterlace, super resolution and more accurate filters based on gpu
         /// </summary>
         public VideoProcessors  VideoProcessor              { get => _VideoProcessor;   set { if (Set(ref _VideoProcessor, value))  player?.renderer?.UpdateVideoProcessor(); } }
         VideoProcessors _VideoProcessor = VideoProcessors.Auto;
@@ -749,6 +753,9 @@ public class Config : NotifyPropertyChanged
         public Vortice.DXGI.PresentFlags
                                 PresentFlags                { get; set; } = Vortice.DXGI.PresentFlags.DoNotWait;
 
+        /// <summary>
+        /// Sets DeInterlace (D3D11VP only)
+        /// </summary>
         public DeInterlace      DeInterlace                 { get => _DeInterlace;      set { if (Set(ref _DeInterlace, value))     player?.renderer?.UpdateDeinterlace(); } }
         DeInterlace _DeInterlace = DeInterlace.Auto;
 
@@ -839,9 +846,7 @@ public class Config : NotifyPropertyChanged
         internal void SetEnabled(bool enabled)      => Set(ref _Enabled, enabled, true, nameof(Enabled));
 
         /// <summary>
-        /// Whether to process samples with Filters or SWR (experimental)<br/>
-        /// 1. Requires FFmpeg avfilter lib<br/>
-        /// 2. Currently SWR performs better if you dont need filters<br/>
+        /// Uses FFmpeg filters instead of Swr (better speed quality and support for extra filters, requires avfilter-X.dll)
         /// </summary>
         public bool             FiltersEnabled      { get => _FiltersEnabled; set { if (Set(ref _FiltersEnabled, value)) player?.AudioDecoder.SetupFiltersOrSwr(); } }
         bool _FiltersEnabled = false;

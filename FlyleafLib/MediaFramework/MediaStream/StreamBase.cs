@@ -78,7 +78,7 @@ public abstract unsafe class StreamBase : NotifyPropertyChanged
     }
 
     // Demuxer Callback
-    internal void UpdateDuration()
+    internal virtual void UpdateDuration()
         => Duration = AVStream->duration != AV_NOPTS_VALUE ? (long)(AVStream->duration * Timebase) : Demuxer.Duration;
 
     protected void UpdateHLS()

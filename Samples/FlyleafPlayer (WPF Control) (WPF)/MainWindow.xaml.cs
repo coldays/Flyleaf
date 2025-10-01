@@ -235,6 +235,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         // Testing misc
         //playerConfig.Demuxer.AllowFindStreamInfo = false;
+        //playerConfig.Player.ZeroLatency = true;
         #endif
         
         // Initializes the Player
@@ -300,7 +301,6 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         Config config = new();
         config.Demuxer.FormatOptToUnderlying= true;     // Mainly for HLS to pass the original query which might includes session keys
-        config.Audio.FiltersEnabled         = true;     // To allow embedded atempo filter for speed
         config.Video.GPUAdapter             = "";       // Set it empty so it will include it when we save it
         config.Subtitles.SearchLocal        = true;
         return config;
@@ -421,6 +421,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         else if (mediaViewer == MediaViewer.Image && imageTitle == null)
             ImageTitle = Player.Playlist.Selected.Title;
         else
+        {
+            if (!e.Success)
+                Player.renderer?.ClearScreenForce();
+
             lock (slideShowLock)
                 if (SlideShow)
                 {
@@ -430,6 +434,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                     slideShowElapsedMs = 0;
                     Task.Run(SlideShowTask, slideShowCancel.Token);
                 }
+        }
     }
 
     bool userClearScreen;

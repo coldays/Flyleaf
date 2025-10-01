@@ -29,8 +29,6 @@ public unsafe class VideoDecoder : DecoderBase
     public long             StartRecordTime     { get; internal set; } = AV_NOPTS_VALUE;
 
     const AVPixelFormat     PIX_FMT_HWACCEL     = AVPixelFormat.AV_PIX_FMT_D3D11;
-    const int          SCALING_HQ          = SWS_ACCURATE_RND | SWS_BITEXACT | SWS_LANCZOS | SWS_FULL_CHR_H_INT | SWS_FULL_CHR_H_INP;
-    const int          SCALING_LQ          = SWS_BICUBLIN;
 
     internal SwsContext*    swsCtx;
     nint                    swsBufferPtr;
@@ -332,7 +330,7 @@ public unsafe class VideoDecoder : DecoderBase
                         = av_image_get_buffer_size(fmt, codecCtx->width, codecCtx->height, 1);
         swsBufferPtr    = Marshal.AllocHGlobal(outBufferSize);
         _ = av_image_fill_arrays(ref swsData, ref swsLineSize, (byte*) swsBufferPtr, fmt, codecCtx->width, codecCtx->height, 1);
-        swsCtx          = sws_getContext(codecCtx->coded_width, codecCtx->coded_height, codecCtx->pix_fmt, codecCtx->width, codecCtx->height, fmt, Config.Video.SwsHighQuality ? SCALING_HQ : SCALING_LQ, null, null, null);
+        swsCtx          = sws_getContext(codecCtx->coded_width, codecCtx->coded_height, codecCtx->pix_fmt, codecCtx->width, codecCtx->height, fmt, 0, null, null, null);
 
         if (swsCtx == null)
         {

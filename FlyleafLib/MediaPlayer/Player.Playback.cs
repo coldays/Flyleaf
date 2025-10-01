@@ -65,7 +65,9 @@ partial class Player
                     ScreamerAudioOnly();
                 else
                 {
-                    if (ReversePlayback)
+                    if (Config.Player.ZeroLatency)
+                        ScreamerZeroLatency();
+                    else if (ReversePlayback)
                     {
                         shouldFlushNext = true;
                         ScreamerReverse();
@@ -75,7 +77,6 @@ partial class Player
                         shouldFlushPrev = true;
                         Screamer();
                     }
-
                 }
 
             } catch (Exception e)

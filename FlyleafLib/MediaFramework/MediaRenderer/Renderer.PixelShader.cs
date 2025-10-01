@@ -112,12 +112,7 @@ unsafe public partial class Renderer
             }
 
             var oldVP       = videoProcessor;
-            var fieldType   = Config.Video.DeInterlace == DeInterlace.Auto ? VideoStream.FieldOrder : (VideoFrameFormat)Config.Video.DeInterlace;
-            VideoProcessor  = !D3D11VPFailed && VideoDecoder.VideoAccelerated &&
-                (Config.Video.VideoProcessor == VideoProcessors.D3D11 || (fieldType != VideoFrameFormat.Progressive && Config.Video.VideoProcessor == VideoProcessors.Auto)) ?
-                VideoProcessors.D3D11 : VideoProcessors.Flyleaf;
-
-            FieldType = fieldType != VideoFrameFormat.Progressive && videoProcessor == VideoProcessors.Flyleaf ? VideoFrameFormat.Progressive : fieldType;
+            VideoProcessor  = GetVP();
 
             if (oldVP != videoProcessor)
             {
@@ -154,7 +149,6 @@ unsafe public partial class Renderer
                     vd1.CreateVideoProcessorOutputView(backBuffer, vpe, vpovd, out vpov);
                     vc.VideoProcessorSetStreamColorSpace(vp, 0, inputColorSpace);
                     vc.VideoProcessorSetOutputColorSpace(vp, outputColorSpace);
-                    vc.VideoProcessorSetStreamFrameFormat(vp, 0, FieldType);
 
                     if (child != null)
                     {
@@ -516,7 +510,7 @@ unsafe public partial class Renderer
                         }
 
                         // GBR(A)
-                        else if (VideoStream.PixelPlanes > 2) // TBR: Usually transfer func 'Linear' for > 8-bit which requires pow (*?)
+                        else if (VideoStream.PixelPlanes > 2) // Possible Alpha | TBR: Usually transfer func 'Linear' for > 8-bit which requires pow (*?)
                         {
                             curPSCase = PSCase.RGBPlanar;
                             curPSUniqueId += ((int)curPSCase).ToString();
@@ -662,7 +656,7 @@ unsafe public partial class Renderer
 
             //AV_PIX_FMT_FLAG_ALPHA (currently used only for RGBA?)
             //context.OMSetBlendState(curPSCase == PSCase.RGBPacked || (curPSCase == PSCase.RGBPlanar && VideoStream.PixelPlanes == 4) ? blendStateAlpha : null);
-            context.OMSetBlendState(curPSCase == PSCase.RGBPacked ? blendStateAlpha : null);
+            context.OMSetBlendState((VideoStream.PixelFormatDesc->flags & AV_PIX_FMT_FLAG_ALPHA) != 0 ? blendStateAlpha : null);
 
             Log.Debug($"Prepared planes for {VideoStream.PixelFormatStr} with {videoProcessor} [{curPSCase}]");
 
