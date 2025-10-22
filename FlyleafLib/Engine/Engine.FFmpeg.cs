@@ -18,7 +18,7 @@ public class FFmpegEngine
             Engine.Log.Info($"Loading FFmpeg libraries from '{Engine.Config.FFmpegPath}'");
             Folder = Utils.GetFolderPath(Engine.Config.FFmpegPath);
             RootPath = Folder;
-            DynamicallyLoadedBindings.FunctionResolver = new SimpleFFmpegWindowsLibraryLoader();
+            DynamicallyLoadedBindings.FunctionResolver = new LavFFmpegWindowsLibraryLoader();
             DynamicallyLoadedBindings.Initialize();
 
             uint ver        = avformat_version();
@@ -85,7 +85,7 @@ public enum FFmpegLogLevel
 }
 
 
-internal class SimpleFFmpegWindowsLibraryLoader : FunctionResolverBase
+internal class LavFFmpegWindowsLibraryLoader : FunctionResolverBase
 {
     private const string Kernel32 = "kernel32";
 
