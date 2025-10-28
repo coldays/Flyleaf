@@ -19,6 +19,7 @@ public static class Logger
                         fileData = [];
     static bool         fileTaskRunning;
     static FileStream   fileStream;
+    static long         fileStreamLength;
     static object       lockFileStream = new();
     static Dictionary<LogLevel, string>
                         logLevels = [];
@@ -38,6 +39,7 @@ public static class Logger
                     while (fileData.TryDequeue(out byte[] data))
                         fileStream.Write(data, 0, data.Length);
                     fileStream.Dispose();
+                    fileStreamLength = 0;
                 }
             }
         };
@@ -114,6 +116,7 @@ public static class Logger
                 {
                     fileStream = new FileStream(output, FileMode.Create, FileAccess.Write);
                 }
+                fileStreamLength = fileStream.Length;
                 if (lastOutput != ":file")
                 {
                     Output = FilePtr;
@@ -128,7 +131,7 @@ public static class Logger
     {
         fileData.Enqueue(Encoding.UTF8.GetBytes($"{msg}\r\n"));
 
-        if (!fileTaskRunning && Engine.Config.LogFileSizeMax > 0 && fileStream.Length >= Engine.Config.LogFileSizeMax)
+        if (!fileTaskRunning && Engine.Config.LogFileSizeMax > 0 && fileStreamLength >= Engine.Config.LogFileSizeMax)
         {
             HandleLogFileRolling();
             return;
@@ -177,6 +180,7 @@ public static class Logger
                 RollLogFiles();
 
                 fileStream = new FileStream(Engine.Config.LogOutput, FileMode.Create, FileAccess.Write);
+                fileStreamLength = 0;
             }
 
             fileTaskRunning = false;
@@ -195,6 +199,7 @@ public static class Logger
                     fileStream.Write(data, 0, data.Length);
 
                 fileStream.Flush();
+                fileStreamLength = fileStream.Length;
             }
 
             fileTaskRunning = false;
