@@ -693,7 +693,7 @@ unsafe partial class Player
 #if NET5_0_OR_GREATER
         var newSpeed = Math.Max(Math.Round((double)curLatency / Config.Player.MaxLatency, 1, MidpointRounding.ToPositiveInfinity), 1.1);
 #else
-        var newSpeed = Math.Max(Math.Round((double)curLatency / (curLatency - Config.Player.MinLatency), 1), 1.1);
+        var newSpeed = Math.Max(Math.Round((double)curLatency / Config.Player.MaxLatency, 1), 1.1);
 #endif
 
         if (newSpeed > 4) // TBR: dispose only as much as required to avoid rebuffering
