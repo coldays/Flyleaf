@@ -976,20 +976,52 @@ unsafe partial class Player
         VideoDemuxer.DisposePackets();
         vDecoder.Flush();
 
+        long lastVideoPts = 0;
+
         while (Status == Status.Playing)
         {
-            vFrame = vDecoder.GetFrameNext();
-            if (vFrame == null)
-                break;
+            int ret = VideoDemuxer.GetNextPacket();
+            if (ret != 0)
+            {
+                continue;
+            }
+            AVPacket* packet = VideoDemuxer.packet;
 
-            // Required?
-            //curTime = vFrame.timestamp;
-            //UI(() => Set(ref _CurTime, curTime, true, nameof(CurTime)));
+            if (packet->stream_index == VideoDemuxer.VideoStream.StreamIndex)
+            {
+                lastVideoPts = packet->pts;
+                vFrame = vDecoder.TryGetFrame(packet);
+                if (vFrame == null)
+                    continue;
 
-            if (renderer.Present(vFrame, false))
-                Video.framesDisplayed++;
+                // Required?
+                //curTime = vFrame.timestamp;
+                //UI(() => Set(ref _CurTime, curTime, true, nameof(CurTime)));
+
+                if (renderer.Present(vFrame, false))
+                    Video.framesDisplayed++;
+                else
+                    Video.framesDropped++;
+            }
+            else if (VideoDemuxer.DataStream is not null && packet->stream_index == VideoDemuxer.DataStream.StreamIndex)
+            {
+                IntPtr ptr = new(packet->data);
+                byte[] dataFrame = new byte[packet->size];
+                System.Runtime.InteropServices.Marshal.Copy(ptr, dataFrame, 0, packet->size);
+
+                DataFrame dFrame = new()
+                {
+                    timestamp   = packet->pts == AV_NOPTS_VALUE ? lastVideoPts : packet->pts,
+                    DataCodecId = VideoDemuxer.DataStream.CodecID,
+                    Data        = dataFrame
+                };
+                OnDataFrame?.Invoke(this, dFrame);
+                av_packet_unref(packet);
+            }
             else
-                Video.framesDropped++;
+            {
+                av_packet_unref(packet);
+            }
         }
 
         if (CanInfo) Log.Info($"Finished -> {TicksToTime(CurTime)}");
