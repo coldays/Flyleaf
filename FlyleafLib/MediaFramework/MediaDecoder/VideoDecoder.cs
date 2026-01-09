@@ -999,7 +999,7 @@ public unsafe class VideoDecoder : DecoderBase
         return null;
     }
 
-    /// <remarks>Deried from GetFrameNext</remarks>
+    /// <remarks>Derived from GetFrameNext</remarks>
     public VideoFrame TryGetFrame(AVPacket* packet)
     {
         if (DecodeFrame(packet) == 0)
@@ -1104,7 +1104,7 @@ public unsafe class VideoDecoder : DecoderBase
     /// Pushes the decoder to the next available VideoFrame (Decoder/Demuxer must not be running)
     /// </summary>
     /// <returns></returns>
-    /// <remarks>Deried from DecodeFrameNext</remarks>
+    /// <remarks>Derived from DecodeFrameNext</remarks>
     public int DecodeFrame(AVPacket* packet)
     {
         int ret;

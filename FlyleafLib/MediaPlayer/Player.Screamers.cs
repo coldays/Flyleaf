@@ -1009,13 +1009,13 @@ unsafe partial class Player
                 byte[] dataFrame = new byte[packet->size];
                 System.Runtime.InteropServices.Marshal.Copy(ptr, dataFrame, 0, packet->size);
 
-                DataFrame mFrame = new()
+                DataFrame dFrame = new()
                 {
                     timestamp   = lastVideoPts,
                     DataCodecId = VideoDemuxer.DataStream.CodecID,
                     Data        = dataFrame
                 };
-                OnDataFrame?.Invoke(this, mFrame);
+                OnDataFrame?.Invoke(this, dFrame);
                 av_packet_unref(packet);
             }
             else
