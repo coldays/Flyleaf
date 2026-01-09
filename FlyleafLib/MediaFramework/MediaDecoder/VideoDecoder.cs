@@ -999,6 +999,21 @@ public unsafe class VideoDecoder : DecoderBase
         return null;
     }
 
+    /// <remarks>Deried from GetFrameNext</remarks>
+    public VideoFrame TryGetFrame(AVPacket* packet)
+    {
+        if (DecodeFrame(packet) == 0)
+        {
+            var mFrame = Renderer.FillPlanes(frame);
+            if (mFrame != null)
+                return mFrame;
+            else if (handleDeviceReset)
+                HandleDeviceReset();
+        }
+
+        return null;
+    }
+
     /// <summary>
     /// Pushes the decoder to the next available VideoFrame (Decoder/Demuxer must not be running)
     /// </summary>
@@ -1084,6 +1099,56 @@ public unsafe class VideoDecoder : DecoderBase
             }
         }
 
+    }
+    /// <summary>
+    /// Pushes the decoder to the next available VideoFrame (Decoder/Demuxer must not be running)
+    /// </summary>
+    /// <returns></returns>
+    /// <remarks>Deried from DecodeFrameNext</remarks>
+    public int DecodeFrame(AVPacket* packet)
+    {
+        int ret;
+        int allowedErrors = Config.Decoder.MaxErrors;
+
+        if (keyPacketRequired)
+        {
+            if ((packet->flags & AV_PKT_FLAG_KEY) != 0 || packet->pts == startPts)
+                keyPacketRequired = false;
+            else
+            {
+                if (CanWarn)
+                    Log.Warn("Ignoring non-key packet");
+                av_packet_unref(packet);
+                return AVERROR(EAGAIN);
+            }
+        }
+
+        ret = avcodec_send_packet(codecCtx, packet);
+
+        if (swFallback) // Should use 'global' packet to reset it in get_format (same packet should use also from DecoderContext)
+        {
+            SWFallback();
+            ret = avcodec_send_packet(codecCtx, packet);
+        }
+
+        av_packet_unref(packet);
+
+        if (ret != 0 && ret != AVERROR(EAGAIN))
+        {
+            if (CanWarn)
+                Log.Warn($"{FFmpegEngine.ErrorCodeToMsg(ret)} ({ret})");
+
+            if (allowedErrors-- < 1)
+            { Log.Error("Too many errors!"); return ret; }
+
+            return -1;
+        }
+
+        if (DecodeFrameNextInternal() == 0)
+        {
+            return 0;
+        }
+        return -1;
     }
     private int DecodeFrameNextInternal()
     {
