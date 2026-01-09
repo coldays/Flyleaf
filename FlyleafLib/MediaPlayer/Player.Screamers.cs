@@ -1011,7 +1011,7 @@ unsafe partial class Player
 
                 DataFrame dFrame = new()
                 {
-                    timestamp   = lastVideoPts,
+                    timestamp   = packet->pts == AV_NOPTS_VALUE ? lastVideoPts : packet->pts,
                     DataCodecId = VideoDemuxer.DataStream.CodecID,
                     Data        = dataFrame
                 };
