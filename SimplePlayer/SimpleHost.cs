@@ -45,7 +45,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
     private static Rect rectRandom = new(1, 2, 3, 4);
 
     private bool _surfaceClosed, _surfaceClosing, _overlayClosed;
-    private int _panPrevX, _panPrevY;
+    private double _panPrevX, _panPrevY;
     private bool _isMouseBindingsSubscribedSurface;
     private bool _isMouseBindingsSubscribedOverlay;
 
@@ -425,14 +425,14 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
             return;
 
         // Do not allow panning when not zoomed in
-        if (Player.renderer.Zoom == 1.0)
+        if (Player.Config.Video.Zoom == 1.0)
             return;
 
         _mouseLeftDownPoint = e.GetPosition(window);
 
         // PanMove
-        _panPrevX = Player.PanXOffset;
-        _panPrevY = Player.PanYOffset;
+        _panPrevX = Player.Config.Video.PanXOffset;
+        _panPrevY = Player.Config.Video.PanYOffset;
         IsPanMoving = true;
 
         window.CaptureMouse();
@@ -494,8 +494,8 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         // Player's Pan Move (Ctrl + Drag Move)
         if (IsPanMoving)
         {
-            Player.PanXOffset = _panPrevX + (int)(cur.X - _mouseLeftDownPoint.X);
-            Player.PanYOffset = _panPrevY + (int)(cur.Y - _mouseLeftDownPoint.Y);
+            Player.Config.Video.PanXOffset = _panPrevX + (cur.X - _mouseLeftDownPoint.X) / _surface.ActualWidth;
+            Player.Config.Video.PanYOffset = _panPrevY + (cur.Y - _mouseLeftDownPoint.Y) / _surface.ActualHeight;
             // Only change viewport once
             //Player.renderer.SetPanXY(
             //    _panPrevX + (int)(cur.X - _mouseLeftDownPoint.X),
@@ -517,9 +517,9 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         var cur = e.GetPosition(_surface);
         Point curDpi = new(cur.X * DpiX, cur.Y * DpiY);
         if (e.Delta > 0)
-            Player.ZoomIn(curDpi);
+            Player.Config.Video.ZoomIn(curDpi);
         else
-            Player.ZoomOut(curDpi);
+            Player.Config.Video.ZoomOut(curDpi);
     }
     private void Overlay_MouseWheel(object sender, MouseWheelEventArgs e)
     {
@@ -529,9 +529,9 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         var cur = e.GetPosition(_overlay);
         Point curDpi = new(cur.X * DpiX, cur.Y * DpiY);
         if (e.Delta > 0)
-            Player.ZoomIn(curDpi);
+            Player.Config.Video.ZoomIn(curDpi);
         else
-            Player.ZoomOut(curDpi);
+            Player.Config.Video.ZoomOut(curDpi);
     }
 
     private void Surface_Closed(object sender, EventArgs e)
@@ -578,7 +578,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         {
             Log.Debug($"De-assign Player #{oldPlayer.PlayerId}");
 
-            oldPlayer.VideoDecoder.DestroySwapChain();
+            oldPlayer.Renderer?.SwapChain.Dispose(rendererFrame: false);
             oldPlayer.Host = null;
         }
 
@@ -601,9 +601,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
 
         if (_surface != null)
         {
-            _surface.Background = new SolidColorBrush(Player.Config.Video.BackgroundColor);
-
-            Player.VideoDecoder.CreateSwapChain(SurfaceHandle);
+            Player.Renderer.SwapChain.Setup(SurfaceHandle);
         }
     }
     private void CreateSurface(bool fromSetOverlay = false)
@@ -619,8 +617,6 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         _surface.ResizeMode = ResizeMode.NoResize;
         _surface.ShowInTaskbar = false;
 
-        _surface.Background = Player != null ? new SolidColorBrush(Player.Config.Video.BackgroundColor) : Brushes.Black;
-
         // When using ItemsControl with ObservableCollection<Player> to fill DataTemplates with SimpleHost EnsureHandle will call Host_loaded
         Loaded -= Host_Loaded;
         SurfaceHandle = new WindowInteropHelper(_surface).EnsureHandle();
@@ -633,7 +629,9 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
         }
         SetWindowLong(SurfaceHandle, (int)WindowLongFlags.GWL_EXSTYLE, (nint)WindowStylesEx.WS_EX_LAYERED);
 
-        Player?.VideoDecoder.CreateSwapChain(SurfaceHandle);
+        SetWindowLong(SurfaceHandle, GetWindowLongEx(SurfaceHandle) | WindowStylesEx.WS_EX_NOREDIRECTIONBITMAP);
+
+        Player?.Renderer.SwapChain.Setup(SurfaceHandle);
 
         _surface.Closed += Surface_Closed;
         _surface.Closing += Surface_Closing;
@@ -832,7 +830,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
             return null;
 
         Point mousePos = Mouse.GetPosition(_surface);
-        var viewport = Player.renderer.GetViewport;
+        var viewport = Player.Renderer.Viewport;
 
         return new Point((mousePos.X - viewport.X) / viewport.Width, (mousePos.Y - viewport.Y) / viewport.Height);
     }
@@ -917,5 +915,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
 
     }
     public void Player_Disposed() => UIInvokeIfRequired(() => Player = null);
+    public void Player_RatioChanged(double keepRatio) { }
+    public bool Player_HandlesRatioResize(int width, int height) => false;
     #endregion
 }

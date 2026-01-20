@@ -7,11 +7,17 @@ using System.Text.RegularExpressions;
 using System.Windows;
 
 using Microsoft.Win32;
+using Vortice.Direct3D11;
 
 namespace FlyleafLib;
 
 public static partial class Utils
 {
+    public static readonly Rect         RectZero            = new(); // Rect.Empty has infinity values
+    public static readonly Point        PointEmpty          = new();
+    public static readonly CornerRadius CornerRadiusEmpty   = new();
+
+
     // VLC : https://github.com/videolan/vlc/blob/master/modules/gui/qt/dialogs/preferences/simple_preferences.cpp
     // Kodi: https://github.com/xbmc/xbmc/blob/master/xbmc/settings/AdvancedSettings.cpp
 
@@ -88,7 +94,7 @@ public static partial class Utils
     /// Invokes the UI thread to execute the specified action
     /// </summary>
     /// <param name="action"></param>
-    public static void UIInvoke(Action action) => Application.Current.Dispatcher.Invoke(action);
+    public static void UIInvoke(Action action) => Application.Current.Dispatcher.Invoke(action, System.Windows.Threading.DispatcherPriority.DataBind);
 
     /// <summary>
     /// Invokes the UI thread if required to execute the specified action
@@ -99,7 +105,7 @@ public static partial class Utils
         if (Environment.CurrentManagedThreadId == Application.Current.Dispatcher.Thread.ManagedThreadId)
             action();
         else
-            Application.Current.Dispatcher.Invoke(action);
+            Application.Current.Dispatcher.Invoke(action, System.Windows.Threading.DispatcherPriority.DataBind);
     }
 
     public static Thread STA(Action action)
@@ -122,8 +128,24 @@ public static partial class Utils
         int mod = num % align;
         return mod == 0 ? num : num + (align - mod);
     }
+
+    /// <summary>
+    /// Works only for power of 2
+    /// </summary>
+    /// <param name="num"></param>
+    /// <param name="align"></param>
+    /// <returns></returns>
+    public static int FFALIGN(int num, int align)
+        => (num + align - 1) & ~(align - 1);
+
     public static float Scale(float value, float inMin, float inMax, float outMin, float outMax)
         => ((value - inMin) * (outMax - outMin) / (inMax - inMin)) + outMin;
+
+    public static double SnapToInt(double value, double epsilon = 1e-6)
+    {
+        double nearest = Math.Round(value);
+        return Math.Abs(value - nearest) < epsilon ? nearest : value;
+    }
 
     /// <summary>
     /// Adds a windows firewall rule if not already exists for the specified program path
@@ -272,13 +294,13 @@ public static partial class Utils
         MediaParts mp = new();
         int index = int.MaxValue; // title end pos
 
-        res = RxSeasonEpisode1.Match(title);
+        res = RxSeasonEpisode1().Match(title);
         if (!res.Success)
         {
-            res = RxSeasonEpisode2.Match(title);
+            res = RxSeasonEpisode2().Match(title);
 
             if (!res.Success)
-                res = RxEpisodePart.Match(title);
+                res = RxEpisodePart().Match(title);
         }
 
         if (res.Groups.Count > 1)
@@ -300,19 +322,19 @@ public static partial class Utils
             title = title[..(title.Length - mp.Extension.Length - 1)];
 
         // non-movie words, 1080p, 2015
-        if ((res = RxExtended.Match(title)).Index > 0 && res.Index < index)
+        if ((res = RxExtended().Match(title)).Index > 0 && res.Index < index)
             index = res.Index;
 
-        if ((res = RxDirectorsCut.Match(title)).Index > 0 && res.Index < index)
+        if ((res = RxDirectorsCut().Match(title)).Index > 0 && res.Index < index)
             index = res.Index;
 
-        if ((res = RxBrrip.Match(title)).Index > 0 && res.Index < index)
+        if ((res = RxBrrip().Match(title)).Index > 0 && res.Index < index)
             index = res.Index;
 
-        if ((res = RxResolution.Match(title)).Index > 0 && res.Index < index)
+        if ((res = RxResolution().Match(title)).Index > 0 && res.Index < index)
             index = res.Index;
 
-        res = RxYear.Match(title);
+        res = RxYear().Match(title);
         Group gc;
         if (res.Success && (gc = res.Groups["year"]).Index > 2)
         {
@@ -325,8 +347,8 @@ public static partial class Utils
             title = title[..index];
 
         title = title.Replace(".", " ").Replace("_", " ");
-        title = RxSpaces.Replace(title, " ");
-        title = RxNonAlphaNumeric.Replace(title, "");
+        title = RxSpaces().Replace(title, " ");
+        title = RxNonAlphaNumeric().Replace(title, "");
 
         mp.Title = title.Trim();
 
@@ -459,7 +481,7 @@ public static partial class Utils
         input.AsSpan().CopyTo(buffer);
         buffer[0] = char.ToLowerInvariant(buffer[0]);
     
-        return buffer.ToString();
+        return new string(buffer.ToArray());
     }
 
     /// <summary>
@@ -467,28 +489,28 @@ public static partial class Utils
     /// </summary>
     /// <param name="filepath">lnk file path</param>
     /// <returns>targetPath or null</returns>
-    //public static string GetLnkTargetPath(string filepath)
-    //{
-    //    try
-    //    {
-    //        // Using dynamic COM
-    //        // ref: https://stackoverflow.com/a/49198242/9070784
-    //        dynamic windowsShell = Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell", true)!);
-    //        dynamic shortcut = windowsShell!.CreateShortcut(filepath);
-    //        string targetPath = shortcut.TargetPath;
+    public static string GetLnkTargetPath(string filepath)
+    {
+        try
+        {
+            // Using dynamic COM
+            // ref: https://stackoverflow.com/a/49198242/9070784
+            dynamic windowsShell = Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell", true)!);
+            dynamic shortcut = windowsShell!.CreateShortcut(filepath);
+            string targetPath = shortcut.TargetPath;
 
-    //        if (string.IsNullOrEmpty(targetPath))
-    //            throw new InvalidOperationException("TargetPath is empty.");
+            if (string.IsNullOrEmpty(targetPath))
+                throw new InvalidOperationException("TargetPath is empty.");
 
-    //        return targetPath;
-    //    }
-    //    catch (Exception e)
-    //    {
-    //        Log($"Resolving Windows Link failed {e.Message} [FilePath: {filepath}]");
+            return targetPath;
+        }
+        catch (Exception e)
+        {
+            Log($"Resolving Windows Link failed {e.Message} [FilePath: {filepath}]");
 
-    //        return null;
-    //    }
-    //}
+            return null;
+        }
+    }
 
     public static string GetBytesReadable(nuint i)
     {
@@ -526,7 +548,10 @@ public static partial class Utils
             readable = i;
         }
         else
-            return $"{i} B"; // Byte
+        {
+            suffix = "B";
+            readable = i;
+        }
 
         // Divide by 1024 to get fractional value
         readable /= 1024;
@@ -626,6 +651,20 @@ public static partial class Utils
         => System.Windows.Media.Color.FromArgb(sColor.A, sColor.R, sColor.G, sColor.B);
     public static Vortice.Mathematics.Color WPFToVorticeColor(System.Windows.Media.Color wColor)
         => new(wColor.R, wColor.G, wColor.B, wColor.A);
+    public static VideoColor WPFToVideoColor(System.Windows.Media.Color wColor)
+    {
+        return new()
+        {
+            Rgba = new()
+            {
+                R = wColor.R / 255.0f,
+                G = wColor.G / 255.0f,
+                B = wColor.B / 255.0f,
+                A = wColor.A / 255.0f
+            }
+        };
+    }
+        
 
     public static readonly double SWFREQ_TO_TICKS = 10000000.0 / Stopwatch.Frequency;
     public static string ToHexadecimal(byte[] bytes)
@@ -637,34 +676,26 @@ public static partial class Utils
         return hexBuilder.ToString();
     }
     public static int GCD(int a, int b) => b == 0 ? a : GCD(b, a % b);
-    public static string TicksToTime(long ticks) => new TimeSpan(ticks).ToString();
     public static void Log(string msg) { try { Debug.WriteLine($"{DateTime.Now:HH.mm.ss.fff} | {msg}"); } catch (Exception) { Debug.WriteLine($"[............] [MediaFramework] {msg}"); } }
 
-    private static Regex RxExtended { get; } = new Regex("[^a-z0-9]extended", RegexOptions.IgnoreCase);
-
-    private static Regex RxDirectorsCut { get; } = new Regex("[^a-z0-9]directors.cut", RegexOptions.IgnoreCase);
+    private static Regex RxExtended() => new Regex("[^a-z0-9]extended", RegexOptions.IgnoreCase);
+    private static Regex RxDirectorsCut() => new Regex("[^a-z0-9]directors.cut", RegexOptions.IgnoreCase);
 
     // s|season 01 ... e|episode|part 01
-    private static Regex RxSeasonEpisode1 { get; } = new Regex(@"(^|[^a-z0-9])(s|season)[^a-z0-9]*(?<season>[0-9]{1,2})[^a-z0-9]*(e|episode|part)[^a-z0-9]*(?<episode>[0-9]{1,2})($|[^a-z0-9])", RegexOptions.IgnoreCase);
-
+    private static Regex RxSeasonEpisode1() => new Regex(@"(^|[^a-z0-9])(s|season)[^a-z0-9]*(?<season>[0-9]{1,2})[^a-z0-9]*(e|episode|part)[^a-z0-9]*(?<episode>[0-9]{1,2})($|[^a-z0-9])", RegexOptions.IgnoreCase);
     // 01x01
-    private static Regex RxSeasonEpisode2 { get; } = new Regex(@"(^|[^a-z0-9])(?<season>[0-9]{1,2})x(?<episode>[0-9]{1,2})($|[^a-z0-9])", RegexOptions.IgnoreCase);
+    private static Regex RxSeasonEpisode2() => new Regex(@"(^|[^a-z0-9])(?<season>[0-9]{1,2})x(?<episode>[0-9]{1,2})($|[^a-z0-9])", RegexOptions.IgnoreCase);
     // TODO: in case of single season should check only for e|episode|part 01
+    private static Regex RxEpisodePart() => new Regex(@"(^|[^a-z0-9])(episode|part)[^a-z0-9]*(?<episode>[0-9]{1,2})($|[^a-z0-9])", RegexOptions.IgnoreCase);
+    private static Regex RxBrrip() => new Regex("[^a-z0-9]brrip", RegexOptions.IgnoreCase);
 
-    private static Regex RxEpisodePart { get; } = new Regex(@"(^|[^a-z0-9])(episode|part)[^a-z0-9]*(?<episode>[0-9]{1,2})($|[^a-z0-9])", RegexOptions.IgnoreCase);
-
-    private static  Regex RxBrrip { get; } = new Regex("[^a-z0-9]brrip", RegexOptions.IgnoreCase);
-
-    private static  Regex RxResolution { get; } = new Regex("[^a-z0-9][0-9]{3,4}p", RegexOptions.IgnoreCase);
-
-    private static  Regex RxYear { get; } = new Regex(@"[^a-z0-9](?<year>(19|20)[0-9][0-9])($|[^a-z0-9])", RegexOptions.IgnoreCase);
-
-    private static  Regex RxSpaces { get; } = new Regex(@"\s{2,}");
-
-    private static Regex RxNonAlphaNumeric {get; } = new Regex(@"[^a-z0-9]$", RegexOptions.IgnoreCase);
+    private static Regex RxResolution() => new Regex("[^a-z0-9][0-9]{3,4}p", RegexOptions.IgnoreCase);
+    private static Regex RxYear() => new Regex(@"[^a-z0-9](?<year>(19|20)[0-9][0-9])($|[^a-z0-9])", RegexOptions.IgnoreCase);
+    private static Regex RxSpaces() => new Regex(@"\s{2,}");
+    private static Regex RxNonAlphaNumeric() => new Regex(@"[^a-z0-9]$", RegexOptions.IgnoreCase);
 
     #region Temp Transfer (v4)
-    #nullable enable
+#nullable enable
     static string metaSpaces = new(' ',"[Metadata] ".Length);
     public static string GetDumpMetadata(Dictionary<string, string>? metadata, string? exclude = null)
     {
@@ -699,9 +730,9 @@ public static partial class Utils
         
         return $"\t[Metadata] {dump}";
     }
-    public static string TicksToTime2(long ticks)
+    public static string TicksToTime(long ticks)
     {
-        if (ticks == AV_NOPTS_VALUE)
+        if (ticks == NoTs)
             return "-";
 
         if (ticks == 0)
@@ -711,13 +742,13 @@ public static partial class Utils
     }
     public static string McsToTime(long micro)
     {
-        if (micro == AV_NOPTS_VALUE)
+        if (micro == NoTs)
             return "-";
 
         if (micro == 0)
             return "00:00:00.000";
 
-        return TsToTime(TimeSpan.FromMilliseconds(micro / 1000d));
+        return TsToTime(TimeSpan.FromMilliseconds(micro/1000.0));
     }
     public static string TsToTime(TimeSpan ts)
     {
@@ -735,32 +766,65 @@ public static partial class Utils
             return ts.ToString(@"\-d\-hh\:mm\:ss\.fff");
     }
     public static string DoubleToTimeMini(double d) => d.ToString("#.000", CultureInfo.InvariantCulture);
-    //public static List<T> GetFlagsAsList<T>(T value) where T : Enum
-    //{
-    //    List<T> values = [];
+    public static string TicksToTimeMini(long ticks)
+    {
+        if (ticks == NoTs)
+            return "-";
 
-    //    var enumValues = Enum.GetValuesAsUnderlyingType(typeof(T));
-    //    //var enumValues = Enum.GetValues(typeof(T)); // breaks AOT?
+        if (ticks == 0)
+            return "00.000";
 
-    //    foreach(T flag in enumValues)
-    //        if (value.HasFlag(flag) && flag.ToString() != "None")
-    //            values.Add(flag);
+        return TsToTimeMini(TimeSpan.FromTicks(ticks));
+    }
+    static string TsToTimeMini(TimeSpan ts)
+    {
+        if (ts.Ticks > 0)
+        {
+            if (ts.TotalMinutes < 1)
+                return ts.ToString(@"ss\.fff");
+            else if (ts.TotalHours < 1)
+                return ts.ToString(@"mm\:ss\.fff");
+            else if (ts.TotalDays < 1)
+                return ts.ToString(@"hh\:mm\:ss\.fff");
+            else
+                return ts.ToString(@"d\-hh\:mm\:ss\.fff");
+        }
+        
+        if (ts.TotalMinutes > -1)
+            return ts.ToString(@"\-ss\.fff");
+        else if (ts.TotalHours > -1)
+            return ts.ToString(@"\-mm\:ss\.fff");
+        else if (ts.TotalDays > -1)
+            return ts.ToString(@"\-hh\:mm\:ss\.fff");
+        else
+            return ts.ToString(@"\-d\-hh\:mm\:ss\.fff");
+    }
+    public static List<T> GetFlagsAsList<T>(T value) where T : Enum
+    {
+        List<T> values = [];
 
-    //    return values;
-    //}
-    //public static string? GetFlagsAsString<T>(T value, string separator = " | ") where T : Enum
-    //{
-    //    string? ret = null;
-    //    List<T> values = GetFlagsAsList(value);
+        //var enumValues = Enum.GetValuesAsUnderlyingType(typeof(T));
+        var enumValues = Enum.GetValues(typeof(T)); // breaks AOT?
 
-    //    if (values.Count == 0)
-    //        return ret;
+        foreach(T flag in enumValues)
+            if (value.HasFlag(flag) && flag.ToString() != "None")
+                values.Add(flag);
 
-    //    for (int i = 0; i < values.Count - 1; i++)
-    //        ret += values[i] + separator; 
+        return values;
+    }
+    public static string? GetFlagsAsString<T>(T value, string separator = " | ") where T : Enum
+    {
+        string? ret = null;
+        List<T> values = GetFlagsAsList(value);
 
-    //    return ret + values[^1];
-    //}
+        if (values.Count == 0)
+            return ret;
+
+        for (int i = 0; i < values.Count - 1; i++)
+            ret += values[i] + separator; 
+
+        return ret + values[^1];
+    }
     public unsafe static string GetFourCCString(uint fourcc)
     {
         byte* t1 = (byte*)av_mallocz(AV_FOURCC_MAX_STRING_SIZE);
@@ -769,6 +833,6 @@ public static partial class Utils
         av_free(t1);
         return ret;
     }
-    #nullable disable
+#nullable disable
     #endregion
 }

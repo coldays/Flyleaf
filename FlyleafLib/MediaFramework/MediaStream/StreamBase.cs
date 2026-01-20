@@ -1,6 +1,4 @@
 ﻿using FlyleafLib.MediaFramework.MediaDemuxer;
-using System.Collections.Generic;
-using static FFmpeg.AutoGen.ffmpeg;
 using static FFmpeg.AutoGen.ffmpegEx;
 
 namespace FlyleafLib.MediaFramework.MediaStream;
@@ -44,7 +42,7 @@ public abstract unsafe class StreamBase : NotifyPropertyChanged
         StreamIndex = AVStream->index;
         Timebase    = av_q2d(AVStream->time_base) * 10000.0 * 1000.0;
         
-        if (AVStream->start_time != AV_NOPTS_VALUE)
+        if (AVStream->start_time != NoTs)
         {
             StartTimePts= AVStream->start_time;
             StartTime   = Demuxer.hlsCtx == null ? (long)(AVStream->start_time * Timebase) : Demuxer.StartTime;
@@ -55,7 +53,6 @@ public abstract unsafe class StreamBase : NotifyPropertyChanged
             StartTimePts= av_rescale_q(StartTime/10, Engine.FFmpeg.AV_TIMEBASE_Q, AVStream->time_base);
         }
 
-        UpdateHLS();
         UpdateMetadata();
         Initialize();
     }
@@ -65,13 +62,13 @@ public abstract unsafe class StreamBase : NotifyPropertyChanged
     // Possible Fields Updated by FFmpeg (after open/decode frame)
     protected void ReUpdate()
     {
-        if (AVStream->start_time != AV_NOPTS_VALUE && Demuxer.hlsCtx == null)
+        if (AVStream->start_time != NoTs && Demuxer.hlsCtx == null)
         {
             StartTimePts= AVStream->start_time;
             StartTime   = (long)(StartTimePts * Timebase);
         }
 
-        if (AVStream->duration != AV_NOPTS_VALUE)
+        if (AVStream->duration != NoTs)
             Duration = (long)(AVStream->duration * Timebase);
 
         UpdateHLS();
@@ -79,7 +76,10 @@ public abstract unsafe class StreamBase : NotifyPropertyChanged
 
     // Demuxer Callback
     internal virtual void UpdateDuration()
-        => Duration = AVStream->duration != AV_NOPTS_VALUE ? (long)(AVStream->duration * Timebase) : Demuxer.Duration;
+    {
+        Duration = AVStream->duration != NoTs ? (long)(AVStream->duration * Timebase) : Demuxer.Duration;
+        UpdateHLS();
+    }
 
     protected void UpdateHLS()
     {
@@ -108,7 +108,7 @@ public abstract unsafe class StreamBase : NotifyPropertyChanged
         {
             b = av_dict_get(AVStream->metadata, "", b, AV_DICT_IGNORE_SUFFIX);
             if (b == null) break;
-            Metadata.Add(BytePtrToStringUTF8(b->key), BytePtrToStringUTF8(b->value));
+            Metadata[BytePtrToStringUTF8(b->key)] = BytePtrToStringUTF8(b->value);
         }
 
         foreach (var kv in Metadata)
@@ -131,12 +131,12 @@ public abstract unsafe class StreamBase : NotifyPropertyChanged
         if (Language.OriginalInput != null)
             dump += $" ({Language.OriginalInput})";
         
-        if (StartTime != AV_NOPTS_VALUE || Duration != AV_NOPTS_VALUE)
+        if (StartTime != NoTs || Duration != NoTs)
         {
             dump += "\r\n\t[Time	 ] ";
-            dump += StartTimePts != AV_NOPTS_VALUE ? $"{TicksToTime2(StartTime)} ({StartTimePts})" : "-";
+            dump += StartTimePts != NoTs ? $"{TicksToTime(StartTime)} ({StartTimePts})" : "-";
             dump += " / ";
-            dump += AVStream->duration != AV_NOPTS_VALUE ? $"{TicksToTime2(Duration)} ({AVStream->duration})": "-";
+            dump += AVStream->duration != NoTs ? $"{TicksToTime(Duration)} ({AVStream->duration})": "-";
             dump += $" | tb: {AVStream->time_base}";
         }
 
@@ -152,8 +152,8 @@ public abstract unsafe class StreamBase : NotifyPropertyChanged
         if (BitRate > 0)
             dump += $", {(int)(BitRate / 1000)} kb/s";
 
-        if (AVStream->disposition != 0)
-            dump += $" - ({AVStream->disposition})";
+        if (AVStream->disposition != (int)DispositionFlags.None)
+            dump += $" - ({GetFlagsAsString((DispositionFlags)AVStream->disposition)})";
 
         if (this is AudioStream audio)
             dump += $"\r\n\t[Format  ] {audio.SampleRate} Hz, {audio.ChannelLayoutStr}, {audio.SampleFormatStr}";

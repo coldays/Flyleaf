@@ -11,6 +11,8 @@ namespace FlyleafLib.MediaFramework.MediaDecoder;
 
 public unsafe partial class AudioDecoder
 {
+    // TODO: Check locks (lockSpeed) - during seek and speed change (also in xaudio submit samples - we change the data len and we lose sync with submited samples vs played)
+
     AVFilterContext*        abufferCtx;
     AVFilterContext*        abufferSinkCtx;
     AVFilterGraph*          filterGraph;
@@ -132,9 +134,9 @@ public unsafe partial class AudioDecoder
             ret = avfilter_graph_config(filterGraph, null);
 
             // CRIT TBR:!!!
-            var tb = 1000 * 10000.0 / sinkTimebase.den; // Ensures we have at least 20-70ms samples to avoid audio crackling and av sync issues
-            //((FilterLink*)abufferSinkCtx->inputs[0])->min_samples = (int) (20 * 10000 / tb);
-            //((FilterLink*)abufferSinkCtx->inputs[0])->max_samples = (int) (70 * 10000 / tb);
+            var tb = 1000 * 10000.0 / sinkTimebase.den; // TBR: DONT CHANGE values will affect Screamer | Ensures we have at least 20-70ms samples to avoid audio crackling and av sync issues
+            ((FilterLink*)abufferSinkCtx->inputs[0])->min_samples = (int) (20 * 10000 / tb);
+            ((FilterLink*)abufferSinkCtx->inputs[0])->max_samples = (int) (70 * 10000 / tb);
 
             return ret < 0
                 ? throw new Exception($"[FilterGraph] {FFmpegEngine.ErrorCodeToMsg(ret)} ({ret})")
@@ -160,13 +162,15 @@ public unsafe partial class AudioDecoder
             avfilter_graph_free(filterGraphPtr);
 
         if (filtframe != null)
-            fixed (AVFrame** ptr = &filtframe)
-                av_frame_free(ptr);
+        {
+            fixed (AVFrame** ptr = &filtframe) av_frame_free(ptr);
+            filtframe = null;
+        }
+            
 
         abufferCtx      = null;
         abufferSinkCtx  = null;
         filterGraph     = null;
-        filtframe       = null;
     }
     protected override void OnSpeedChanged(double value)
     {
@@ -178,26 +182,27 @@ public unsafe partial class AudioDecoder
                 DrainFilters();
 
             cBufTimesCur= 1;
-            oldSpeed    = speed;
             speed       = value;
 
             var frames = Frames.ToArray();
             for (int i = 0; i < frames.Length; i++)
-                FixSample(frames[i], oldSpeed, speed);
+                FixSample(frames[i], speed);
 
             if (filterGraph != null)
                 SetupFilters();
         }
     }
-    internal void FixSample(AudioFrame frame, double oldSpeed, double speed)
+    internal void FixSample(AudioFrame frame, double newSpeed)
     {
-        var oldDataLen = frame.dataLen;
-        frame.dataLen = Align((int) (oldDataLen * oldSpeed / speed), ASampleBytes);
+        var oldSpeed    = frame.speed;
+        var oldDataLen  = frame.dataLen;
+        frame.dataLen   = Align((int) (oldDataLen * oldSpeed / newSpeed), ASampleBytes);
+        frame.speed     = newSpeed;
         fixed (byte* cBufStartPosPtr = &cBuf[0])
         {
             var curOffset = (long)frame.dataPtr - (long)cBufStartPosPtr;
 
-            if (speed < oldSpeed)
+            if (newSpeed < oldSpeed)
             {
                 if (curOffset + frame.dataLen >= cBuf.Length)
                 {
@@ -290,7 +295,7 @@ public unsafe partial class AudioDecoder
 
         int ret;
 
-        if ((ret = av_buffersrc_add_frame_flags(abufferCtx, frame, 8 | 1)) < 0) // AV_BUFFERSRC_FLAG_KEEP_REF = 8, AV_BUFFERSRC_FLAG_NO_CHECK_FORMAT = 1 (we check format change manually before here)
+        if ((ret = av_buffersrc_add_frame_flags(abufferCtx, frame, (int)(AVBuffersrcFlag.KeepRef | AVBuffersrcFlag.NoCheckFormat))) < 0) // We check format change manually before here
         {
             Log.Warn($"[buffersrc] {FFmpegEngine.ErrorCodeToMsg(ret)} ({ret})");
             Status = Status.Stopping;
@@ -378,11 +383,12 @@ public unsafe partial class AudioDecoder
 
         AudioFrame mFrame = new()
         {
-            dataLen         = curLen,
-            timestamp       = (long)((newPts * AudioStream.Timebase) - demuxer.StartTime + Config.Audio.Delay)
+            dataLen     = curLen,
+            Timestamp   = (long)((newPts * AudioStream.Timebase) - demuxer.StartTime + Config.Audio.Delay),
+            speed       = speed
         };
 
-        if (CanTrace) Log.Trace($"Processes {TicksToTime(mFrame.timestamp)}");
+        if (CanTrace) Log.Trace($"Processes {TicksToTime(mFrame.Timestamp)}");
 
         fixed (byte* circularBufferPosPtr = &cBuf[cBufPos])
             mFrame.dataPtr = (IntPtr)circularBufferPosPtr;

@@ -28,13 +28,13 @@ public class Subtitles : NotifyPropertyChanged
     /// </summary>
     public string   SubsText        { get => subsText;     internal set => Set(ref _SubsText,  value); }
     internal string _SubsText = "", subsText = "";
+    public void ClearSubsText() { subsText = ""; if (_SubsText != "") UI(() => SubsText = subsText); }
 
     public Player Player => player;
 
     Action uiAction;
     Player player;
     DecoderContext decoder => player?.decoder;
-    Config Config => player.Config;
 
     public Subtitles(Player player)
     {
@@ -43,9 +43,9 @@ public class Subtitles : NotifyPropertyChanged
         uiAction = () =>
         {
             StreamIndex = streamIndex;
-            IsOpened    = IsOpened;
-            Codec       = Codec;
-            SubsText    = SubsText;
+            IsOpened    = isOpened;
+            Codec       = codec;
+            SubsText    = subsText;
         };
     }
     internal void Reset()
@@ -55,7 +55,7 @@ public class Subtitles : NotifyPropertyChanged
         isOpened    = false;
         subsText    = "";
         player.sFramePrev = null;
-        player.renderer?.ClearOverlayTexture();
+        player.Renderer?.SubsDispose();
 
         player.UIAdd(uiAction);
     }
@@ -68,7 +68,7 @@ public class Subtitles : NotifyPropertyChanged
         isOpened    =!decoder.SubtitlesDecoder.Disposed;
         subsText    = "";
         player.sFramePrev = null;
-        player.renderer?.ClearOverlayTexture();
+        player.Renderer.SubsDispose();
 
         player.UIAdd(uiAction);
     }
@@ -92,10 +92,4 @@ public class Subtitles : NotifyPropertyChanged
         Reset();
         player.UIAll();
     }
-
-    public void DelayRemove()   => Config.Subtitles.Delay -= Config.Player.SubtitlesDelayOffset;
-    public void DelayAdd()      => Config.Subtitles.Delay += Config.Player.SubtitlesDelayOffset;
-    public void DelayRemove2()  => Config.Subtitles.Delay -= Config.Player.SubtitlesDelayOffset2;
-    public void DelayAdd2()     => Config.Subtitles.Delay += Config.Player.SubtitlesDelayOffset2;
-    public void Toggle()        => Config.Subtitles.Enabled = !Config.Subtitles.Enabled;
 }
