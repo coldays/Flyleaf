@@ -590,7 +590,7 @@ public class VPConfig : NotifyPropertyChanged
         ZoomCenter  = p;
         vp?.VPRequest(VPRequestType.Viewport);
     }
-    internal void SetZoomWithCenterPoint(Point p, double zoom)
+    public void SetZoomWithCenterPoint(Point p, double zoom)
     {
         /* Notes
          * Zooms in a way that the specified point before zoom will be at the same position after zoom
