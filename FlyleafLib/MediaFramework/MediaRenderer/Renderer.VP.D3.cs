@@ -87,16 +87,42 @@ public unsafe partial class Renderer
         var d3CacheEntry = D3CacheEntry.Get(GPUAdapter.Luid, out var needsFillUnlock);
         if (d3CacheEntry.Failed && !needsFillUnlock)
             return;
-        
-        vd = device.QueryInterface<ID3D11VideoDevice>();
-        if (vd == null)
-        {
-            if (needsFillUnlock) Monitor.Exit(d3CacheEntry);
 
+        try
+        {
+            vd = device.QueryInterface<ID3D11VideoDevice>();
+            if (vd == null)
+            {
+                if (needsFillUnlock) Monitor.Exit(d3CacheEntry);
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warn($"[{nameof(D3Setup)}] Exception while querying {nameof(ID3D11VideoDevice)}: {ex}");
+            if (needsFillUnlock)
+                Monitor.Exit(d3CacheEntry);
             return;
         }
-        
-        vc = context.QueryInterface<ID3D11VideoContext>();
+
+        try
+        {
+            vc = context.QueryInterface<ID3D11VideoContext>();
+        }
+        catch (Exception ex)
+        {
+            Log.Warn($"[{nameof(D3Setup)}] Exception while querying {nameof(ID3D11VideoContext)}: {ex}");
+            if (vp == null)
+            {
+                if (ve != null) { ve.Dispose(); ve = null; }
+                if (vc != null) { vc.Dispose(); vc = null; }
+
+                if (needsFillUnlock) Monitor.Exit(d3CacheEntry);
+
+                return;
+            }
+        }
+
         if (vc != null)
             if (vd.CreateVideoProcessorEnumerator   (ref vped, out ve).Success)    // TBR: vpcd config (maybe requires max sizes)
                 vd.CreateVideoProcessor             (ve, 0, out vp);               // TBR: config for which rate index?
