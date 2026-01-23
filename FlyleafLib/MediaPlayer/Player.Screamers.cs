@@ -283,9 +283,16 @@ unsafe partial class Player
         while (status == Status.Playing)
         {
             int ret = VideoDemuxer.GetNextPacket();
-            if (ret != 0)
+            if (ret < 0)
             {
-                continue;
+                if (ret == AVERROR(EAGAIN))
+                {
+                    continue;
+                }
+                else
+                {
+                    break;
+                }
             }
             AVPacket* packet = VideoDemuxer.packet;
 
