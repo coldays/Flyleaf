@@ -251,6 +251,15 @@ unsafe public partial class Renderer
             */
 
         Viewport view = GetViewport;
+        if (zoom <= 1.0)
+        {
+            this.zoom = 1.0;
+            panYOffset = 0;
+            panXOffset = 0;
+            this.zoomCenter = new(0.5, 0.5);
+            SetViewport();
+            return;
+        }
 
         if (!(p.X >= view.X && p.X < view.X + view.Width && p.Y >= view.Y && p.Y < view.Y + view.Height)) // Point out of view
         {
