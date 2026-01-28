@@ -1,30 +1,22 @@
 ﻿using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using System.Windows;
 
 using Vortice;
-using Vortice.DXGI;
 using Vortice.Direct3D11;
+using Vortice.DXGI;
 using Vortice.Mathematics;
 
 using FlyleafLib.MediaFramework.MediaDecoder;
 using FlyleafLib.MediaFramework.MediaFrame;
 using FlyleafLib.MediaFramework.MediaStream;
-
-using ID3D11Device = Vortice.Direct3D11.ID3D11Device;
+using FlyleafLib.MediaPlayer;
 
 namespace FlyleafLib.MediaFramework.MediaRenderer;
 
 
 /* TODO
- * 1) Attach on every frame video output configuration so we will not have to worry for video codec change etc.
- *      this will fix also dynamic video stream change
- *      we might have issue with bufRef / ffmpeg texture array on zero copy
- *
- * 2) Use different context/video processor for off rendering so we dont have to reset pixel shaders/viewports etc (review also rtvs for extractor)
- *
- * 3) Add Crop (Left/Right/Top/Bottom) -on Source- support per pixels (easy implemantation with D3D11VP, FlyleafVP requires more research)
- *
- * 4) Improve A/V Sync
+ * Improve A/V Sync
  *
  *  a. vsync / vblack
  *  b. Present can cause a delay (based on device load), consider using more buffers for high frame rates that could minimize the delay
@@ -37,23 +29,20 @@ namespace FlyleafLib.MediaFramework.MediaRenderer;
 
 public partial class Renderer : NotifyPropertyChanged, IDisposable
 {
-    public Config           Config          { get; private set;}
+    public Config           Config          { get; private set; }
     public int              ControlWidth    { get; private set; }
     public int              ControlHeight   { get; private set; }
-    internal IntPtr           ControlHandle;
-
+    internal nint           ControlHandle;
+    
     internal Action<IDXGISwapChain2>
                             SwapChainWinUIClbk;
 
-    public ID3D11Device     Device          { get; private set; }
-    public bool             D3D11VPFailed   => vc == null;
-    public GPUAdapter       GPUAdapter      { get; private set; }
     public bool             Disposed        { get; private set; } = true;
     public bool             SCDisposed      { get; private set; } = true;
     public int              MaxOffScreenTextures
                                             { get; set; } = 20;
     public VideoDecoder     VideoDecoder    { get; internal set; }
-    public VideoStream      VideoStream     => VideoDecoder.VideoStream;
+    internal VideoStream    VideoStream;
 
     public Viewport         GetViewport     { get; private set; }
     public event EventHandler ViewportChanged;
@@ -61,13 +50,14 @@ public partial class Renderer : NotifyPropertyChanged, IDisposable
     public uint             VisibleWidth    { get; private set; }
     public uint             VisibleHeight   { get; private set; }
     public AspectRatio      DAR             { get; set; }
+    public double           CurRatio        => curRatio;
     double curRatio, keepRatio, fillRatio;
     CropRect cropRect; // + User's Cropping
     uint textWidth, textHeight; // Padded (Codec/Texture)
 
-    public CornerRadius     CornerRadius    { get => cornerRadius;              set { if (cornerRadius == value) return; cornerRadius = value; UpdateCornerRadius(); } }
-    CornerRadius cornerRadius = new CornerRadius(0);
-    CornerRadius zeroCornerRadius = new CornerRadius(0);
+    public CornerRadius     CornerRadius    { get => cornerRadius;              set => UpdateCornerRadius(value); }
+    CornerRadius cornerRadius = new(0);
+    bool cornerRadiusNeedsUpdate;
 
     public int              SideXPixels     { get; private set; }
     public int              SideYPixels     { get; private set; }
@@ -76,36 +66,22 @@ public partial class Renderer : NotifyPropertyChanged, IDisposable
     int panXOffset;
     public void SetPanX(int panX, bool refresh = true)
     {
-        lock(lockDevice)
-        {
-            panXOffset = panX;
-
-            if (Disposed)
-                return;
-
-            SetViewport(refresh);
-        }
+        panXOffset = panX;
+        SetViewport(refresh);
     }
 
     public int              PanYOffset      { get => panYOffset;                set => SetPanY(value); }
     int panYOffset;
     public void SetPanY(int panY, bool refresh = true)
     {
-        lock(lockDevice)
-        {
-            panYOffset = panY;
-
-            if (Disposed)
-                return;
-
-            SetViewport(refresh);
-        }
+        panYOffset = panY;
+        SetViewport(refresh);
     }
 
     public uint             Rotation        { get => _RotationAngle;            set => UpdateRotation(value); }
     uint _RotationAngle;
     VideoProcessorRotation _d3d11vpRotation  = VideoProcessorRotation.Identity;
-    bool rotationLinesize; // if negative should be vertically flipped
+    bool hasLinesizeVFlip; // if negative should be vertically flipped
 
     public bool             HFlip           { get => _HFlip;                    set { _HFlip = value; UpdateRotation(_RotationAngle); } }
     bool _HFlip;
@@ -126,21 +102,8 @@ public partial class Renderer : NotifyPropertyChanged, IDisposable
     double zoom = 1;
     public void SetZoom(double zoom, bool refresh = true)
     {
-        lock(lockDevice)
-        {
-            if (zoom < 1)
-            {
-                ResetPanAndZoom(refresh);
-                return;
-            }
-
-            this.zoom = zoom;
-
-            if (Disposed)
-                return;
-
-            SetViewport(refresh);
-        }
+        this.zoom = zoom;
+        SetViewport(refresh);
     }
 
     public Point            ZoomCenter      { get => zoomCenter;                set => SetZoomCenter(value); }
@@ -148,66 +111,23 @@ public partial class Renderer : NotifyPropertyChanged, IDisposable
     internal static Point ZoomCenterPoint = new Point(0.5, 0.5);
     public void SetZoomCenter(Point p, bool refresh = true)
     {
-        lock(lockDevice)
-        {
-            zoomCenter = p;
-
-            if (Disposed)
-                return;
-
-            if (refresh)
-                SetViewport();
-        }
+        zoomCenter = p;
+        SetViewport(refresh);
     }
     public void SetZoomAndCenter(double zoom, Point p, bool refresh = true)
     {
-        lock(lockDevice)
-        {
-            if (zoom < 1)
-            {
-                ResetPanAndZoom(refresh);
-                return;
-            }
-
-            this.zoom = zoom;
-            zoomCenter = p;
-
-            if (Disposed)
-                return;
-
-            if (refresh)
-                SetViewport();
-        }
+        this.zoom = zoom;
+        zoomCenter = p;
+        SetViewport(refresh);
     }
     public void SetPanAll(int panX, int panY, uint rotation, double zoom, Point p, bool refresh = true)
     {
-        lock(lockDevice)
-        {
-            panXOffset = panX;
-            panYOffset = panY;
-            this.zoom = zoom;
-            zoomCenter = p;
-            UpdateRotation(rotation, false);
-
-            if (Disposed)
-                return;
-
-            if (refresh)
-                SetViewport();
-        }
-    }
-
-    private void ResetPanAndZoom(bool refresh = true)
-    {
-        panXOffset = panYOffset = 0;
-        zoom = 1;
-        zoomCenter = ZoomCenterPoint;
-
-        if (Disposed)
-            return;
-
-        if (refresh)
-            SetViewport(refresh);
+        panXOffset = panX;
+        panYOffset = panY;
+        this.zoom = zoom;
+        zoomCenter = p;
+        UpdateRotation(rotation, false);
+        SetViewport(refresh);
     }
 
     public int              UniqueId        { get; private set; }
@@ -216,87 +136,75 @@ public partial class Renderer : NotifyPropertyChanged, IDisposable
     public RawRect          VideoRect       { get; set; }
 
     LogHandler Log;
-    bool use2d;
+    Player player;
 
-    public Renderer(VideoDecoder videoDecoder, IntPtr handle, int uniqueId = -1)
+    private Renderer(nint handle, int uniqueId, Config config)
     {
-        UniqueId    = uniqueId == -1 ? GetUniqueId() : uniqueId;
-        VideoDecoder= videoDecoder;
-        Config      = videoDecoder.Config;
-        Log         = new(("[#" + UniqueId + "]").PadRight(8, ' ') + " [Renderer      ] ");
-        use2d       = Config.Video.Use2DGraphics;
+        UniqueId            = uniqueId == -1 ? GetUniqueId() : uniqueId;
+        wndProcDelegate     = new(WndProc);
+        wndProcDelegatePtr  = Marshal.GetFunctionPointerForDelegate(wndProcDelegate);
+        ControlHandle       = handle;
+        Config              = config;
+        BGRA_OR_RGBA        = Config.Video.SwapForceR8G8B8A8 ? Format.R8G8B8A8_UNorm : Format.B8G8R8A8_UNorm;
+        player              = Config.Player.player;
 
         overlayTextureDesc = new Texture2DDescription()
         {
-            Usage       = ResourceUsage.Default,
-            Width       = 0,
-            Height      = 0,
-            Format      = Format.B8G8R8A8_UNorm,
-            ArraySize   = 1,
-            MipLevels   = 1,
-            BindFlags   = BindFlags.ShaderResource,
-            SampleDescription = new(1, 0)
+            Usage               = ResourceUsage.Default,
+            Width               = 0,
+            Height              = 0,
+            Format              = BGRA_OR_RGBA,
+            ArraySize           = 1,
+            MipLevels           = 1,
+            BindFlags           = BindFlags.ShaderResource,
+            SampleDescription   = new(1, 0)
         };
-
         singleStageDesc = new()
         {
-            Usage       = ResourceUsage.Staging,
-            Format      = Format.B8G8R8A8_UNorm,
-            ArraySize   = 1,
-            MipLevels   = 1,
-            BindFlags   = BindFlags.None,
+            Usage               = ResourceUsage.Staging,
+            Format              = BGRA_OR_RGBA,
+            ArraySize           = 1,
+            MipLevels           = 1,
+            BindFlags           = BindFlags.None,
             CPUAccessFlags      = CpuAccessFlags.Read,
             SampleDescription   = new(1, 0),
-
-            Width       = 0,
-            Height      = 0
+            Width               = 0,
+            Height              = 0
         };
-
         singleGpuDesc = new()
         {
-            Usage       = ResourceUsage.Default,
-            Format      = Format.B8G8R8A8_UNorm,
-            ArraySize   = 1,
-            MipLevels   = 1,
-            BindFlags   = BindFlags.RenderTarget | BindFlags.ShaderResource,
+            Usage               = ResourceUsage.Default,
+            Format              = BGRA_OR_RGBA,
+            ArraySize           = 1,
+            MipLevels           = 1,
+            BindFlags           = BindFlags.RenderTarget | BindFlags.ShaderResource,
             SampleDescription   = new(1, 0)
         };
 
-        wndProcDelegate = new Utils.NativeMethods.SubclassWndProc(WndProc);
-        wndProcDelegatePtr = Marshal.GetFunctionPointerForDelegate(wndProcDelegate);
-        ControlHandle = handle;
-        Initialize();
-    }
+        var confAdapter = Config.Video.GPUAdapter;
+        if (string.IsNullOrEmpty(confAdapter))
+            return;
 
-    #region Replica Renderer (Expiremental)
-    public Renderer child; // allow access to child renderer (not safe)
-    Renderer parent;
-    public Renderer(Renderer renderer, IntPtr handle, int uniqueId = -1)
-    {
-        UniqueId            = uniqueId == -1 ? GetUniqueId() : uniqueId;
-        Log                 = new(("[#" + UniqueId + "]").PadRight(8, ' ') + " [Renderer  Repl] ");
-
-        renderer.child      = this;
-        parent              = renderer;
-        Config              = renderer.Config;
-        wndProcDelegate     = new Utils.NativeMethods.SubclassWndProc(WndProc);
-        wndProcDelegatePtr  = Marshal.GetFunctionPointerForDelegate(wndProcDelegate);
-        ControlHandle       = handle;
-    }
-
-    public void SetChildHandle(IntPtr handle)
-    {
-        lock (lockDevice)
+        if (confAdapter.Equals("WARP", StringComparison.CurrentCultureIgnoreCase))
+            gpuForceWarp = true;
+        else
         {
-            if (child != null)
-                DisposeChild();
-
-            if (handle == IntPtr.Zero)
-                return;
-
-            child = new Renderer(this, handle, UniqueId);
-            InitializeChildSwapChain();
+            foreach (var gpuAdapter in Engine.Video.GPUAdapters.Values)
+                if (Regex.IsMatch(gpuAdapter.Description,      confAdapter, RegexOptions.IgnoreCase) ||
+                    Regex.IsMatch(gpuAdapter.Luid.ToString(),  confAdapter, RegexOptions.IgnoreCase))
+                {
+                    this.gpuAdapter = gpuAdapter;
+                    dxgiAdapter     = gpuAdapter.dxgiAdapter;
+                    break;
+                }
         }
     }
-    #endregion
+    public Renderer(VideoDecoder videoDecoder, nint handle = 0, int uniqueId = -1) : this(handle, uniqueId, videoDecoder.Config)
+    {
+        Log                 = new(("[#" + UniqueId + "]").PadRight(8, ' ') + " [Renderer      ] ");
+        VideoDecoder        = videoDecoder;
+        use2d               = Config.Video.Use2DGraphics;
+
+        Initialize();
+    }
 }

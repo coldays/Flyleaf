@@ -77,7 +77,7 @@ public static class Logger
                     fileStream = new FileStream(output, FileMode.Append, FileAccess.Write);
                     Output = FilePtr;
                 }
-
+                    
                 else if (Engine.Config.LogRollMaxFiles > 0 && Engine.Config.LogRollMaxFileSize > 0)
                 {
                     RollLogFiles(); // If we have rolling log enables and do not append, then we need to roll the log files first
@@ -110,8 +110,7 @@ public static class Logger
         {
             if (fileStream.Length >= Engine.Config.LogRollMaxFileSize)
             {
-                while (fileTaskRunning)
-                    Thread.Sleep(10);
+                while (fileTaskRunning) Thread.Sleep(10);
 
                 lock (lockFileStream)
                 {

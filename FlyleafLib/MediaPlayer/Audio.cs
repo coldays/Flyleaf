@@ -163,6 +163,7 @@ public class Audio : NotifyPropertyChanged
     AudioBuffer             audioBuffer = new();
     internal double         Timebase;
     internal ulong          submittedSamples;
+    int                     curSampleRate = -1;
     #endregion
 
     public Audio(Player player)
@@ -172,21 +173,20 @@ public class Audio : NotifyPropertyChanged
         uiAction = () =>
         {
             StreamIndex     = streamIndex;
-            IsOpened        = IsOpened;
-            Codec           = Codec;
-            BitRate         = BitRate;
-            Bits            = Bits;
-            Channels        = Channels;
-            ChannelLayout   = ChannelLayout;
-            SampleFormat    = SampleFormat;
-            SampleRate      = SampleRate;
+            IsOpened        = isOpened;
+            Codec           = codec;
+            BitRate         = bitRate;
+            Bits            = bits;
+            Channels        = channels;
+            ChannelLayout   = channelLayout;
+            SampleFormat    = sampleFormat;
+            SampleRate      = sampleRate;
 
-            FramesDisplayed = FramesDisplayed;
-            FramesDropped   = FramesDropped;
+            FramesDisplayed = framesDisplayed;
+            FramesDropped   = framesDropped;
         };
 
         Volume = Config.Player.VolumeMax / 2;
-        Initialize();
     }
 
     internal void Initialize()
@@ -199,8 +199,10 @@ public class Audio : NotifyPropertyChanged
                 return;
             }
 
-            sampleRate = decoder != null && decoder.AudioStream != null && decoder.AudioStream.SampleRate > 0 ? decoder.AudioStream.SampleRate : 48000;
-            player.Log.Info($"Initialiazing audio ({Device.Name} - {Device.Id} @ {SampleRate}Hz)");
+            if (!isOpened || sampleRate <= 0)
+                return;
+
+            player.Log.Info($"Initialiazing audio at {sampleRate}Hz ({Device.Id}:{Device.Name})");
 
             Dispose();
 
@@ -218,13 +220,14 @@ public class Audio : NotifyPropertyChanged
                 }
 
                 sourceVoice = xaudio2.CreateSourceVoice(waveFormat, false);
-                sourceVoice.SetSourceSampleRate(SampleRate);
+                sourceVoice.SetSourceSampleRate(sampleRate);
                 sourceVoice.Start();
 
                 submittedSamples        = 0;
                 Timebase                = 1000 * 10000.0 / sampleRate;
                 masteringVoice.Volume   = Config.Player.VolumeMax / 100.0f;
                 sourceVoice.Volume      = mute ? 0 : Math.Max(0, _Volume / 100.0f);
+                curSampleRate           = sampleRate;
             }
             catch (Exception e)
             {
@@ -275,17 +278,37 @@ public class Audio : NotifyPropertyChanged
                 if (CanDebug)
                     player.Log.Debug($"[Audio] Submitting samples failed ({e.Message})");
 
-                ClearBuffer(); // TBR: Inform player to resync audio?
+                ClearBuffer();
             }
         }
     }
     internal long GetBufferedDuration() { lock (locker) { return (long) ((submittedSamples - sourceVoice.State.SamplesPlayed) * Timebase); } }
-    internal long GetDeviceDelay()      { lock (locker) { return (long) ((xaudio2.PerformanceData.CurrentLatencyInSamples * Timebase) - 80000); } } // TODO: VBlack delay (8ms correction for now)
+    internal long GetDeviceDelay()
+    {
+        /* TODO
+         * Get rid of lockers during playback
+         * VBlack delay (8ms correction for now)
+         * TBR: (Very rare) Possible invalid response after quick Clear Buffers?* can return huge number ~60sec and can't even restore on next clear buffer
+         */
+        lock (locker)
+        {
+            var latency = (long) ((xaudio2.PerformanceData.CurrentLatencyInSamples * Timebase) - 8_0000);
+            if (latency > TimeSpan.FromMilliseconds(500).Ticks)
+            {
+                #if DEBUG
+                player.Log.Error($"!!! Device Latency nosense -> {TicksToTimeMini(latency)}");
+                #endif
+                return TimeSpan.FromMilliseconds(40).Ticks;
+            }
+            
+            return latency;
+        }
+    }
     internal void ClearBuffer()
     {
         lock (locker)
         {
-            if (sourceVoice == null)
+            if (submittedSamples == 0 || sourceVoice == null)
                 return;
 
             sourceVoice.Stop();
@@ -309,9 +332,13 @@ public class Audio : NotifyPropertyChanged
         ClearBuffer();
         player.UIAdd(uiAction);
     }
-    internal void Refresh()
+    internal void Refresh(bool fromCodec = false)
     {
-        if (decoder.AudioStream == null) { Reset(); return; }
+        if (decoder.AudioStream == null)
+        {
+            Reset();
+            return;
+        }
 
         streamIndex     = decoder.AudioStream.StreamIndex;
         codec           = decoder.AudioStream.Codec;
@@ -320,13 +347,23 @@ public class Audio : NotifyPropertyChanged
         channelLayout   = decoder.AudioStream.ChannelLayoutStr;
         sampleFormat    = decoder.AudioStream.SampleFormatStr;
         isOpened        =!decoder.AudioDecoder.Disposed;
+        sampleRate      = decoder.AudioStream.SampleRate;
 
         framesDisplayed = 0;
         framesDropped   = 0;
 
-        if (SampleRate!= decoder.AudioStream.SampleRate)
-            Initialize();
+        if (fromCodec)
+        {
+            if (sampleRate <= 0)
+            {   // Possible with AllowFindStreamInfo = false
+                Disable();
+                return;
+            }
 
+            if (sampleRate != curSampleRate)
+                Initialize();
+        }
+        
         player.UIAdd(uiAction);
     }
     internal void Enable()
@@ -335,7 +372,7 @@ public class Audio : NotifyPropertyChanged
 
         decoder.OpenSuggestedAudio();
 
-        player.ReSync(decoder.AudioStream, (int) (player.CurTime / 10000), true);
+        player.ReSync(decoder.AudioStream, (int) (player.curTime / 10000), true);
 
         Refresh();
         player.UIAll();
@@ -349,9 +386,7 @@ public class Audio : NotifyPropertyChanged
             return;
 
         decoder.CloseAudio();
-
-        player.aFrame = null;
-
+        player.UpdateMainDemuxer(); // possible in Reset (consider close event)?
         if (!player.Video.IsOpened)
         {
             player.canPlay = false;

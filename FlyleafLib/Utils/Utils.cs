@@ -88,7 +88,7 @@ public static partial class Utils
     /// Invokes the UI thread to execute the specified action
     /// </summary>
     /// <param name="action"></param>
-    public static void UIInvoke(Action action) => Application.Current.Dispatcher.Invoke(action);
+    public static void UIInvoke(Action action) => Application.Current.Dispatcher.Invoke(action, System.Windows.Threading.DispatcherPriority.DataBind);
 
     /// <summary>
     /// Invokes the UI thread if required to execute the specified action
@@ -99,7 +99,7 @@ public static partial class Utils
         if (Environment.CurrentManagedThreadId == Application.Current.Dispatcher.Thread.ManagedThreadId)
             action();
         else
-            Application.Current.Dispatcher.Invoke(action);
+            Application.Current.Dispatcher.Invoke(action, System.Windows.Threading.DispatcherPriority.DataBind);
     }
 
     public static Thread STA(Action action)
@@ -637,7 +637,6 @@ public static partial class Utils
         return hexBuilder.ToString();
     }
     public static int GCD(int a, int b) => b == 0 ? a : GCD(b, a % b);
-    public static string TicksToTime(long ticks) => new TimeSpan(ticks).ToString();
     public static void Log(string msg) { try { Debug.WriteLine($"{DateTime.Now:HH.mm.ss.fff} | {msg}"); } catch (Exception) { Debug.WriteLine($"[............] [MediaFramework] {msg}"); } }
 
     private static Regex RxExtended { get; } = new Regex("[^a-z0-9]extended", RegexOptions.IgnoreCase);
@@ -699,7 +698,7 @@ public static partial class Utils
         
         return $"\t[Metadata] {dump}";
     }
-    public static string TicksToTime2(long ticks)
+    public static string TicksToTime(long ticks)
     {
         if (ticks == AV_NOPTS_VALUE)
             return "-";
@@ -735,32 +734,65 @@ public static partial class Utils
             return ts.ToString(@"\-d\-hh\:mm\:ss\.fff");
     }
     public static string DoubleToTimeMini(double d) => d.ToString("#.000", CultureInfo.InvariantCulture);
-    //public static List<T> GetFlagsAsList<T>(T value) where T : Enum
-    //{
-    //    List<T> values = [];
+    public static string TicksToTimeMini(long ticks)
+    {
+        if (ticks == NoTs)
+            return "-";
 
-    //    var enumValues = Enum.GetValuesAsUnderlyingType(typeof(T));
-    //    //var enumValues = Enum.GetValues(typeof(T)); // breaks AOT?
+        if (ticks == 0)
+            return "00.000";
 
-    //    foreach(T flag in enumValues)
-    //        if (value.HasFlag(flag) && flag.ToString() != "None")
-    //            values.Add(flag);
+        return TsToTimeMini(TimeSpan.FromTicks(ticks));
+    }
+    static string TsToTimeMini(TimeSpan ts)
+    {
+        if (ts.Ticks > 0)
+        {
+            if (ts.TotalMinutes < 1)
+                return ts.ToString(@"ss\.fff");
+            else if (ts.TotalHours < 1)
+                return ts.ToString(@"mm\:ss\.fff");
+            else if (ts.TotalDays < 1)
+                return ts.ToString(@"hh\:mm\:ss\.fff");
+            else
+                return ts.ToString(@"d\-hh\:mm\:ss\.fff");
+        }
+        
+        if (ts.TotalMinutes > -1)
+            return ts.ToString(@"\-ss\.fff");
+        else if (ts.TotalHours > -1)
+            return ts.ToString(@"\-mm\:ss\.fff");
+        else if (ts.TotalDays > -1)
+            return ts.ToString(@"\-hh\:mm\:ss\.fff");
+        else
+            return ts.ToString(@"\-d\-hh\:mm\:ss\.fff");
+    }
+    public static List<T> GetFlagsAsList<T>(T value) where T : Enum
+    {
+        List<T> values = [];
 
-    //    return values;
-    //}
-    //public static string? GetFlagsAsString<T>(T value, string separator = " | ") where T : Enum
-    //{
-    //    string? ret = null;
-    //    List<T> values = GetFlagsAsList(value);
+        //var enumValues = Enum.GetValuesAsUnderlyingType(typeof(T));
+        var enumValues = Enum.GetValues(typeof(T)); // breaks AOT?
 
-    //    if (values.Count == 0)
-    //        return ret;
+        foreach (T flag in enumValues)
+            if (value.HasFlag(flag) && flag.ToString() != "None")
+                values.Add(flag);
 
-    //    for (int i = 0; i < values.Count - 1; i++)
-    //        ret += values[i] + separator; 
+        return values;
+    }
+    public static string? GetFlagsAsString<T>(T value, string separator = " | ") where T : Enum
+    {
+        string? ret = null;
+        List<T> values = GetFlagsAsList(value);
 
-    //    return ret + values[^1];
-    //}
+        if (values.Count == 0)
+            return ret;
+
+        for (int i = 0; i < values.Count - 1; i++)
+            ret += values[i] + separator;
+
+        return ret + values[^1];
+    }
     public unsafe static string GetFourCCString(uint fourcc)
     {
         byte* t1 = (byte*)av_mallocz(AV_FOURCC_MAX_STRING_SIZE);

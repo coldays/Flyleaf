@@ -17,6 +17,8 @@ using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 
+using Vortice.DXGI;
+
 namespace FlyleafLib;
 
 public enum PixelFormatType
@@ -61,19 +63,21 @@ public enum VideoProcessors
     D3D11,
     Flyleaf,
 }
-public enum ZeroCopy : int
+public enum SplitFrameAlphaPosition
 {
-    Auto        = 0,
-    Enabled     = 1,
-    Disabled    = 2
+    None,
+    Top,
+    Left,
+    Bottom,
+    Right
 }
 [Flags]
 public enum Cropping
 {
     None,
-    Stream,
-    Codec,
-    Texture
+    Stream  = 1 << 0,
+    Codec   = 1 << 1,
+    Texture = 1 << 2
 }
 public enum ColorSpace : int
 {
@@ -106,46 +110,56 @@ public enum HDRFormat : int
 
 public class GPUOutput
 {
-    internal static int GPUOutputIdGenerator;
-
-    public int      Id              { get; internal set; }
-    public string   DeviceName      { get; internal set; }
-    public int      Left            { get; internal set; }
-    public int      Top             { get; internal set; }
-    public int      Right           { get; internal set; }
-    public int      Bottom          { get; internal set; }
-    public int      Width           => Right- Left;
-    public int      Height          => Bottom- Top;
-    public bool     IsAttached      { get; internal set; }
-    public int      Rotation        { get; internal set; }
-    public float    MaxLuminance    { get; internal set; }
+    public nint             Hwnd            { get; internal set; }
+    public string           DeviceName      { get; internal set; }
+    public int              Left            { get; internal set; }
+    public int              Top             { get; internal set; }
+    public int              Right           { get; internal set; }
+    public int              Bottom          { get; internal set; }
+    public int              Width           => Right- Left;
+    public int              Height          => Bottom- Top;
+    public bool             IsAttached      { get; internal set; }
+    public ModeRotation     Rotation        { get; internal set; }
+    public float            MaxLuminance    { get; internal set; }
+    //public int              RefreshRate     { get; internal set; } // Currently not used
 
     public override string ToString()
     {
         int gcd = GCD(Width, Height);
-        return $"{DeviceName,-20} [Id: {Id,-4}\t, Top: {Top,-4}, Left: {Left,-4}, Width: {Width,-4}, Height: {Height,-4}, Ratio: [" + (gcd > 0 ? $"{Width/gcd}:{Height/gcd}]" : "]");
+        return $"{DeviceName,-20} [Top: {Top,-4}, Left: {Left,-4}, Width: {Width,-4}, Height: {Height,-4}, Ratio: " + (gcd > 0 ? $"{Width / gcd}:{Height / gcd}]" : "]");
     }
 }
 
 public class GPUAdapter
 {
-    public int      MaxHeight       { get; internal set; }
-    public nuint    SystemMemory    { get; internal set; }
-    public nuint    VideoMemory     { get; internal set; }
-    public nuint    SharedMemory    { get; internal set; }
+    public nuint            SystemMemory    { get; internal set; }
+    public nuint            VideoMemory     { get; internal set; }
+    public nuint            SharedMemory    { get; internal set; }
 
+    public uint             Id              { get; internal set; }
+    public GPUVendor        Vendor          { get; internal set; }
+    public string           Description     { get; internal set; }
+    public long             Luid            { get; internal set; }
 
-    public uint     Id              { get; internal set; }
-    public string   Vendor          { get; internal set; }
-    public string   Description     { get; internal set; }
-    public long     Luid            { get; internal set; }
-    public bool     HasOutput       { get; internal set; }
-    public List<GPUOutput>
-                    Outputs         { get; internal set; }
+    internal IDXGIAdapter   dxgiAdapter;
 
-    public override string ToString()
+    public List<GPUOutput>  GetGPUOutputs()    => Engine.Video.GetGPUOutputs(dxgiAdapter);
+
+    public override string  ToString()
         => (Vendor + " " + Description).PadRight(40) + $"[ID: {Id,-6}, LUID: {Luid,-6}, DVM: {GetBytesReadable(VideoMemory),-8}, DSM: {GetBytesReadable(SystemMemory),-8}, SSM: {GetBytesReadable(SharedMemory)}]";
 }
+
+public enum GPUVendor : uint
+{
+    Unknown,
+    ATI         = 0x1002,
+    Intel       = 0x8086,
+    Nvidia      = 0x10DE,
+    Qualcomm    = 0x4D4F4351,
+    S3Graphics  = 0x5333,
+    VIA         = 0x1106,
+}
+
 public enum VideoFilters
 {
     // Ensure we have the same values with Vortice.Direct3D11.VideoProcessorFilterCaps (d3d11.h) | we can extended if needed with other values
@@ -186,7 +200,7 @@ public struct AspectRatio : IEquatable<AspectRatio>
 
     public double Value
     {
-        readonly get => Num / Den;
+        readonly get => Den == 0 ? 0 : Num / Den;
         set { Num = value; Den = 1; }
     }
 
@@ -209,13 +223,13 @@ public struct AspectRatio : IEquatable<AspectRatio>
     public void FromString(string value)
     {
         if (value == "Keep")
-            { Num = Keep.Num; Den = Keep.Den; return; }
+            { Num = Keep.Num;       Den = Keep.Den;     return; }
         else if (value == "Fill")
-            { Num = Fill.Num; Den = Fill.Den; return; }
+            { Num = Fill.Num;       Den = Fill.Den;     return; }
         else if (value == "Custom")
-            { Num = Custom.Num; Den = Custom.Den; return; }
+            { Num = Custom.Num;     Den = Custom.Den;   return; }
         else if (value == "Invalid")
-            { Num = Invalid.Num; Den = Invalid.Den; return; }
+            { Num = Invalid.Num;    Den = Invalid.Den;  return; }
 
         string newvalue = value.ToString().Replace(',', '.');
 

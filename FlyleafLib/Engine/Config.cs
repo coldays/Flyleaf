@@ -21,6 +21,10 @@ namespace FlyleafLib;
 /// </summary>
 public class Config : NotifyPropertyChanged
 {
+#if NET5_0_OR_GREATER
+    public static JsonSerializerOptions jsonOpts = new() { WriteIndented = true };
+#endif
+
     public Config()
     {
         // Parse default plugin options to Config.Plugins (Creates instances until fix with statics in interfaces)
@@ -215,11 +219,6 @@ public class Config : NotifyPropertyChanged
                         KeyBindings                 { get; set; } = new KeysConfig();
 
         /// <summary>
-        /// Fps while the player is not playing
-        /// </summary>
-        public double   IdleFps                     { get; set; } = 60.0;
-
-        /// <summary>
         /// Zero Latency forces playback at the very last frame received (Live Video Only)
         /// </summary>
         public bool     ZeroLatency                 { get => _ZeroLatency; set { Set(ref _ZeroLatency, value); if (config != null) config.Decoder.LowDelay = value; if (player != null && player.IsPlaying) { player.Pause(); player.Play(); } } }
@@ -312,7 +311,8 @@ public class Config : NotifyPropertyChanged
         /// <summary>
         /// Refreshes CurTime in UI on every frame (can cause performance issues)
         /// </summary>
-        public bool     UICurTimePerFrame           { get; set; } = false;
+        public UIRefreshType
+                        UICurTime                   { get; set; } = UIRefreshType.PerFrameSecond;
 
         /// <summary>
         /// The upper limit of the volume amplifier
@@ -405,101 +405,100 @@ public class Config : NotifyPropertyChanged
         /// <summary>
         /// Maximuim allowed packets for buffering (as an extra check along with BufferDuration)
         /// </summary>
-        public long             BufferPackets   { get; set; }
+        public long             BufferPackets       { get; set; }
 
         /// <summary>
         /// Maximuim allowed audio packets (when reached it will drop the extra packets and will fire the AudioLimit event)
         /// </summary>
-        public long             MaxAudioPackets { get; set; }
+        public long             MaxAudioPackets     { get; set; }
 
         /// <summary>
         /// Maximum allowed errors before stopping
         /// </summary>
-        public int              MaxErrors       { get; set; } = 30;
+        public int              MaxErrors           { get; set; } = 30;
 
         /// <summary>
         /// Custom IO Stream buffer size (in bytes) for the AVIO Context
         /// </summary>
-        public int              IOStreamBufferSize
-                                                { get; set; } = 0x200000;
+        public int              IOStreamBufferSize  { get; set; } = 0x200000;
 
         /// <summary>
         /// avformat_close_input timeout (ticks) for protocols that support interrupts
         /// </summary>
-        public long             CloseTimeout    { get => closeTimeout; set { closeTimeout = value; closeTimeoutMs = value / 10000; } }
+        public long             CloseTimeout        { get => closeTimeout; set { closeTimeout = value; closeTimeoutMs = value / 10000; } }
         private long closeTimeout = 1 * 1000 * 10000;
         internal long closeTimeoutMs = 1 * 1000;
 
         /// <summary>
         /// avformat_open_input + avformat_find_stream_info timeout (ticks) for protocols that support interrupts (should be related to probesize/analyzeduration)
         /// </summary>
-        public long             OpenTimeout     { get => openTimeout; set { openTimeout = value; openTimeoutMs = value / 10000; } }
+        public long             OpenTimeout         { get => openTimeout; set { openTimeout = value; openTimeoutMs = value / 10000; } }
         private long openTimeout = 5 * 60 * (long)1000 * 10000;
         internal long openTimeoutMs = 5 * 60 * 1000;
 
         /// <summary>
         /// av_read_frame timeout (ticks) for protocols that support interrupts
         /// </summary>
-        public long             ReadTimeout     { get => readTimeout; set { readTimeout = value; readTimeoutMs = value / 10000; } }
+        public long             ReadTimeout         { get => readTimeout; set { readTimeout = value; readTimeoutMs = value / 10000; } }
         private long readTimeout = 10 * 1000 * 10000;
         internal long readTimeoutMs = 10 * 1000;
 
         /// <summary>
         /// av_read_frame timeout (ticks) for protocols that support interrupts (for Live streams)
         /// </summary>
-        public long             ReadLiveTimeout { get => readLiveTimeout; set { readLiveTimeout = value; readLiveTimeoutMs = value / 10000; } }
+        public long             ReadLiveTimeout     { get => readLiveTimeout; set { readLiveTimeout = value; readLiveTimeoutMs = value / 10000; } }
         private long readLiveTimeout = 20 * 1000 * 10000;
         internal long readLiveTimeoutMs = 20 * 1000;
 
         /// <summary>
         /// av_seek_frame timeout (ticks) for protocols that support interrupts
         /// </summary>
-        public long             SeekTimeout     { get => seekTimeout; set { seekTimeout = value; seekTimeoutMs = value / 10000; } }
+        public long             SeekTimeout         { get => seekTimeout; set { seekTimeout = value; seekTimeoutMs = value / 10000; } }
         private long seekTimeout = 8 * 1000 * 10000;
         internal long seekTimeoutMs = 8 * 1000;
 
         /// <summary>
         /// Forces Input Format
         /// </summary>
-        public string           ForceFormat     { get; set; }
+        public string           ForceFormat         { get; set; }
 
         /// <summary>
         /// Forces FPS for NoTimestamp formats (such as h264/hevc)
         /// </summary>
-        public double           ForceFPS        { get; set; }
+        public double           ForceFPS            { get; set; }
 
         /// <summary>
         /// FFmpeg's format flags for demuxer (see https://ffmpeg.org/doxygen/trunk/avformat_8h.html)
         /// eg. FormatFlags |= 0x40; // For AVFMT_FLAG_NOBUFFER
         /// </summary>
-        public int     FormatFlags     { get; set; } = ffmpeg.AVFMT_FLAG_DISCARD_CORRUPT;
+        public int     FormatFlags         { get; set; } = AVFMT_FLAG_DISCARD_CORRUPT;
 
         /// <summary>
         /// Certain muxers and demuxers do nesting (they open one or more additional internal format contexts). This will pass the FormatOpt and HTTPQuery params to the underlying contexts)
         /// </summary>
         public bool             FormatOptToUnderlying
-                                                { get; set; }
+                                                    { get; set; }
 
         /// <summary>
         /// Passes original's Url HTTP Query String parameters to underlying
         /// </summary>
         public bool             DefaultHTTPQueryToUnderlying
-                                                { get; set; } = true;
+                                                    { get; set; } = true;
 
         /// <summary>
         /// HTTP Query String parameters to pass to underlying
         /// </summary>
         public Dictionary<string, string>
                                 ExtraHTTPQueryParamsToUnderlying
-                                                { get; set; } = [];
+                                                    { get; set; } = [];
 
         /// <summary>
         /// FFmpeg's format options for demuxer
         /// </summary>
         public Dictionary<string, string>
-                                FormatOpt       { get; set; } = DefaultVideoFormatOpt();
+                                FormatOpt           { get; set; } = DefaultVideoFormatOpt();
         public Dictionary<string, string>
-                                AudioFormatOpt  { get; set; } = DefaultVideoFormatOpt();
+                                AudioFormatOpt      { get; set; } = DefaultVideoFormatOpt();
 
         public Dictionary<string, string>
                                 SubtitlesFormatOpt  { get; set; } = DefaultVideoFormatOpt();
@@ -554,52 +553,70 @@ public class Config : NotifyPropertyChanged
         /// <summary>
         /// Threads that will be used from the decoder
         /// </summary>
-        public int              VideoThreads    { get; set; } = Environment.ProcessorCount;
+        public int              VideoThreads        { get; set; } = Environment.ProcessorCount;
 
         /// <summary>
         /// Maximum video frames to be decoded and processed for rendering
         /// </summary>
-        public int              MaxVideoFrames  { get => _MaxVideoFrames; set { if (Set(ref _MaxVideoFrames, value)) { player?.RefreshMaxVideoFrames(); } } }
+        public int              MaxVideoFrames      { get => _MaxVideoFrames;   set { if (Set(ref _MaxVideoFrames, value)) { player?.RefreshMaxVideoFrames(); } } }
         int _MaxVideoFrames = 4;
+        internal void SetMaxVideoFrames(int maxVideoFrames) { _MaxVideoFrames = maxVideoFrames; RaiseUI(nameof(MaxVideoFrames)); } // can be updated by video decoder if fails to allocate them
 
         /// <summary>
         /// Maximum audio frames to be decoded and processed for playback
         /// </summary>
-        public int              MaxAudioFrames  { get; set; } = 10;
+        public int              MaxAudioFrames      { get; set; } = 5;
 
         /// <summary>
         /// Maximum subtitle frames to be decoded
         /// </summary>
-        public int              MaxSubsFrames   { get; set; } = 1;
+        public int              MaxSubsFrames       { get; set; } = 1;
 
         /// <summary>
         /// Maximum data frames to be decoded
         /// </summary>
-        public int              MaxDataFrames   { get; set; } = 100;
+        public int              MaxDataFrames       { get; set; } = 100;
 
         /// <summary>
         /// Maximum allowed errors before stopping
         /// </summary>
-        public int              MaxErrors       { get; set; } = 200;
+        public int              MaxErrors           { get; set; } = 200;
 
         /// <summary>
         /// Allows video accceleration even in codec's profile mismatch
         /// </summary>
-        public bool             AllowProfileMismatch
-                                                { get => _AllowProfileMismatch; set => SetUI(ref _AllowProfileMismatch, value); }
-        bool _AllowProfileMismatch;
+        public bool             AllowProfileMismatch{ get => _AllowProfileMismatch; set => SetUI(ref _AllowProfileMismatch, value); }
+        bool _AllowProfileMismatch = false;
 
         /// <summary>
         /// Allows corrupted frames (Parses AV_CODEC_FLAG_OUTPUT_CORRUPT to AVCodecContext)
         /// </summary>
-        public bool             ShowCorrupted   { get => _ShowCorrupted; set => SetUI(ref _ShowCorrupted, value); }
+        public bool             ShowCorrupted       { get => _ShowCorrupted;        set => SetUI(ref _ShowCorrupted, value); }
         bool _ShowCorrupted;
 
         /// <summary>
-        /// Forces low delay (Parses AV_CODEC_FLAG_LOW_DELAY to AVCodecContext) (auto-enabled with MaxLatency)
+        /// Forces low delay (Parses AV_CODEC_FLAG2_FAST or AV_CODEC_FLAG_LOW_DELAY -based on DropFrames- to AVCodecContext) (auto-enabled with MaxLatency)
         /// </summary>
-        public bool             LowDelay        { get => _LowDelay; set => SetUI(ref _LowDelay, value); }
+        public bool             LowDelay            { get => _LowDelay;             set => SetUI(ref _LowDelay, value); }
         bool _LowDelay;
+
+        /// <summary>
+        /// Sets AVCodecContext skip_frame to None or Default (affects also LowDelay)
+        /// </summary>
+        public bool             AllowDropFrames     { get => _AllowDropFrames;      set => SetUI(ref _AllowDropFrames, value); }
+        bool _AllowDropFrames;
+
+        public string           AudioCodec          { get => _AudioCodec;           set => SetUI(ref _AudioCodec, value); }
+        internal string _AudioCodec;
+
+        public string           VideoCodec          { get => _VideoCodec;           set => SetUI(ref _VideoCodec, value); }
+        internal string _VideoCodec;
+
+        public string           SubtitlesCodec      { get => _SubtitlesCodec;           set => SetUI(ref _SubtitlesCodec, value); }
+        internal string _SubtitlesCodec;
+
+        public string GetCodecPtr(MediaType type)
+            => type == MediaType.Video ? _VideoCodec : type == MediaType.Audio ? _AudioCodec : _SubtitlesCodec;
 
         public Dictionary<string, string>
                                 AudioCodecOpt       { get; set; } = [];
@@ -615,8 +632,8 @@ public class Config : NotifyPropertyChanged
     {
         public VideoConfig()
         {
-            BindingOperations.EnableCollectionSynchronization(Filters, lockFilters);
-            BindingOperations.EnableCollectionSynchronization(D3Filters, lockD3Filters);
+            BindingOperations.EnableCollectionSynchronization(Filters,  lockFilters);
+            BindingOperations.EnableCollectionSynchronization(D3Filters,lockD3Filters);
         }
 
         public VideoConfig Clone()
@@ -635,6 +652,12 @@ public class Config : NotifyPropertyChanged
         /// </summary>
         public string           GPUAdapter                  { get; set; }
 
+        /// <summary>
+        /// Embedded alpha channel in HW decoded -horizontal/vertical- split frame (FlyleafVP only)
+        /// </summary>
+        public SplitFrameAlphaPosition
+                                SplitFrameAlphaPosition     { get => _SplitFrameAlphaPosition;   set => Set(ref _SplitFrameAlphaPosition, value); }
+        internal SplitFrameAlphaPosition _SplitFrameAlphaPosition;
         /// <summary>
         /// Video aspect ratio
         /// </summary>
@@ -712,16 +735,10 @@ public class Config : NotifyPropertyChanged
         public int              MaxVerticalResolution       => MaxVerticalResolutionCustom == 0 ? (MaxVerticalResolutionAuto != 0 ? MaxVerticalResolutionAuto : 1080) : MaxVerticalResolutionCustom;
 
         /// <summary>
-        /// Sets Nvidia Super Resolution (D3D11VP only)
+        /// Sets Super Resolution (Nvidia / Intel - D3D11VP only)
         /// </summary>
-        public bool             SuperResolutionNvidia       { get => _SuperResolutionNvidia;        set { Set(ref _SuperResolutionNvidia, value); player?.renderer?.UpdateSuperResNvidia(value); } }
-        internal bool _SuperResolutionNvidia;
-
-        /// <summary>
-        /// Sets Intel Super Resolution (D3D11VP only)
-        /// </summary>
-        public bool             SuperResolutionIntel        { get => _SuperResolutionIntel;         set { Set(ref _SuperResolutionIntel, value); player?.renderer?.UpdateSuperResIntel(value); } }
-        internal bool _SuperResolutionIntel;
+        public bool             SuperResolution             { get => _SuperResolution;  set { if (Set(ref _SuperResolution, value)) player?.renderer?.UpdateSuperRes(); } }
+        internal bool _SuperResolution;
 
         /// <summary>
         /// Forces SwsScale instead of FlyleafVP for non HW decoded frames
@@ -744,14 +761,7 @@ public class Config : NotifyPropertyChanged
         /// <summary>
         /// Whether Vsync should be enabled (0: Disabled, 1: Enabled)
         /// </summary>
-        public uint             VSync                       { get; set; }
-
-        /// <summary>
-        /// Swap chain's present flags (mainly for waitable -None- or non-waitable -DoNotWait) (default: non-waitable)<br/>
-        /// Non-waitable swap chain will reduce re-buffering and audio/video desyncs
-        /// </summary>
-        public Vortice.DXGI.PresentFlags
-                                PresentFlags                { get; set; } = Vortice.DXGI.PresentFlags.DoNotWait;
+        public uint             VSync                       { get; set; } = 1;
 
         /// <summary>
         /// Sets DeInterlace (D3D11VP only)
@@ -760,17 +770,45 @@ public class Config : NotifyPropertyChanged
         DeInterlace _DeInterlace = DeInterlace.Auto;
 
         /// <summary>
+        /// Whether to use double rate (Bob) for DeInterlace instead normal (Weave/Blend)
+        /// </summary>
+        public bool             DoubleRate                  { get => _DoubleRate;       set => Set(ref _DoubleRate, value); }
+        bool _DoubleRate = true;
+
+        /// <summary>
         /// The HDR to SDR method that will be used by the pixel shader
         /// </summary>
-        public unsafe HDRtoSDRMethod
-                                HDRtoSDRMethod              { get => _HDRtoSDRMethod;   set { if (Set(ref _HDRtoSDRMethod, value))  player?.renderer?.UpdateHDRtoSDR(); }}
+        public HDRtoSDRMethod   HDRtoSDRMethod              { get => _HDRtoSDRMethod;   set { if (Set(ref _HDRtoSDRMethod, value))  player?.renderer?.UpdateHDRtoSDR(); } }
         HDRtoSDRMethod _HDRtoSDRMethod = HDRtoSDRMethod.Hable;
 
         /// <summary>
-        /// SDR Display Peak Luminance (will be used for HDR to SDR conversion)
+        /// SDR Display Peak Luminance - tonemap for HDR to SDR (based on Auto/Custom)
         /// </summary>
-        public unsafe float     SDRDisplayNits              { get => _SDRDisplayNits;   set { if (Set(ref _SDRDisplayNits, value))  player?.renderer?.UpdateHDRtoSDR(); } }
-        float _SDRDisplayNits = Engine.Video.RecommendedLuminance;
+        [XmlIgnore]
+#if NET5_0_OR_GREATER
+        [JsonIgnore]
+#endif
+        public float SDRDisplayNits
+        {
+            get => SDRDisplayNitsCustom == 0 ? (SDRDisplayNitsAuto != 0 ? SDRDisplayNitsAuto : 200) : SDRDisplayNitsCustom;
+            set => SDRDisplayNitsCustom = value;
+        }
+
+        /// <summary>
+        /// SDR Display Peak Luminance - tonemap for HDR to SDR (Recommended)
+        /// </summary>
+        [XmlIgnore]
+#if NET5_0_OR_GREATER
+        [JsonIgnore]
+#endif
+        public float            SDRDisplayNitsAuto          { get => _SDRDisplayNitsAuto;   set { if (Set(ref _SDRDisplayNitsAuto, value) && _SDRDisplayNitsCustom == 0) { player?.renderer?.UpdateHDRtoSDR(); RaiseUI(nameof(SDRDisplayNits)); } } }
+        float _SDRDisplayNitsAuto;
+
+        /// <summary>
+        /// SDR Display Peak Luminance - tonemap for HDR to SDR (Custom)
+        /// </summary>
+        public float            SDRDisplayNitsCustom        { get => _SDRDisplayNitsCustom; set { if (Set(ref _SDRDisplayNitsCustom, value)) { player?.renderer?.UpdateHDRtoSDR(); RaiseUI(nameof(SDRDisplayNits)); } } }
+        float _SDRDisplayNitsCustom;
 
         /// <summary>
         /// Whether the renderer will use 10-bit swap chaing or 8-bit output
@@ -788,7 +826,7 @@ public class Config : NotifyPropertyChanged
         /// (TBR: causes slightly different colors with D3D11VP)
         /// </para>
         /// </summary>
-        public bool             SwapForceR8G8B8A8           { get; set; }
+        public bool             SwapForceR8G8B8A8           { get; set; } // TBR: Causes issues with NVidia Super Resolution (with some formats)
 
         /// <summary>
         /// Enables custom Direct2D drawing over playback frames
@@ -860,7 +898,7 @@ public class Config : NotifyPropertyChanged
         /// <summary>
         /// Audio languages preference by priority
         /// </summary>
-        public List<Language>   Languages { get { _Languages ??= GetSystemLanguages(); return _Languages; } set => _Languages = value; }
+        public List<Language>   Languages           { get { _Languages ??= GetSystemLanguages(); return _Languages; } set => _Languages = value; }
         List<Language> _Languages;
     }
     public class SubtitlesConfig : NotifyPropertyChanged
@@ -909,7 +947,7 @@ public class Config : NotifyPropertyChanged
         /// Allowed input types to be searched locally for subtitles (empty list allows all types)
         /// </summary>
         public List<InputType>  SearchLocalOnInputType
-                                                    { get; set; } = [ InputType.File, InputType.UNC, InputType.Torrent ];
+                                                    { get; set; } = [InputType.File, InputType.UNC, InputType.Torrent];
 
         /// <summary>
         /// Whether to use online search plugins (see also <see cref="SearchOnlineOnInputType"/>)
@@ -921,7 +959,7 @@ public class Config : NotifyPropertyChanged
         /// Allowed input types to be searched online for subtitles (empty list allows all types)
         /// </summary>
         public List<InputType>  SearchOnlineOnInputType
-                                                    { get; set; } = [ InputType.File, InputType.UNC, InputType.Torrent ];
+                                                    { get; set; } = [InputType.File, InputType.UNC, InputType.Torrent];
 
         /// <summary>
         /// Subtitles parser (can be used for custom parsing)
@@ -1038,12 +1076,12 @@ public class EngineConfig
     /// <summary>
     /// Max filesize (in bytes) of log before starting a new log file <see cref="LogRollMaxFiles"/>
     /// </summary>
-    public long     LogRollMaxFileSize { get; set; } = 1024 * 1024;
+    public long     LogRollMaxFileSize      { get; set; } = 10 * 1024 * 1024;
 
     /// <summary>
-    /// Max number of backup logfiles to roll over before deleting the oldest, setting this to 0 disables rollover
+    /// Max number of log files to roll over before deleting the oldest
     /// </summary>
-    public long     LogRollMaxFiles { get; set; } = 0;
+    public long     LogRollMaxFiles         { get; set; } = 0;
 
     /// <summary>
     /// Sets the logger's datetime string format
@@ -1058,16 +1096,11 @@ public class EngineConfig
     public string   PluginsPath             { get; set; } = "Plugins";
 
     /// <summary>
-    /// Updates Player.CurTime when the second changes otherwise on every UIRefreshInterval
-    /// </summary>
-    public bool     UICurTimePerSecond      { get; set; } = true;
-
-    /// <summary>
     /// <para>Activates Master Thread to monitor all the players and perform the required updates</para>
     /// <para>Required for Activity Mode, Stats &amp; Buffered Duration on Pause</para>
     /// </summary>
     public bool     UIRefresh               { get => _UIRefresh; set { _UIRefresh = value; if (value && Engine.IsLoaded) Engine.StartThread(); } }
-    static bool _UIRefresh;
+    static bool _UIRefresh = true;
 
     /// <summary>
     /// <para>How often should update the UI in ms (low values can cause performance issues)</para>
@@ -1120,4 +1153,12 @@ public class EngineConfig
         xmlSerializer.Serialize(fs, this);
 #endif
     }
+}
+
+public enum UIRefreshType
+{
+    PerFrame,
+    PerFrameSecond,
+    PerUIRefreshInterval,
+    PerUISecond
 }

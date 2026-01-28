@@ -917,5 +917,7 @@ public class SimpleHost : ContentControl, IHostPlayer, IDisposable
 
     }
     public void Player_Disposed() => UIInvokeIfRequired(() => Player = null);
+    public void Player_RatioChanged(double keepRatio) { }
+    public bool Player_HandlesRatioResize(int width, int height) => false;
     #endregion
 }

@@ -80,11 +80,17 @@ unsafe public partial class Renderer
 
             // Don't use SCDisposed as we need to allow config planes even before swapchain creation
             // TBR: Possible run ConfigPlanes after swapchain creation instead (currently we don't access any resources of the swapchain here and is safe)
-            if (Disposed || VideoStream == null)
+            if (Disposed)
                 return false;
 
             if (frame != null) // Called from Stream / Codec (requires full reset)
             {
+                VideoDecoder.DisposeFrame(LastFrame); LastFrame = null; // We could still keep it if same config? same processor?
+
+                VideoStream = VideoDecoder.VideoStream;
+                if (VideoStream == null)
+                    return false;
+
                 if (VideoDecoder.VideoAccelerated)
                 {
                     var desc    = VideoDecoder.textureFFmpeg.Description;
@@ -104,24 +110,24 @@ unsafe public partial class Renderer
                 }
 
                 VideoRect       = new(0, 0, (int)textWidth, (int)textHeight);
-                rotationLinesize= false;
+                hasLinesizeVFlip= false;
 
-                UpdateRotation(_RotationAngle, false);
-                UpdateHDRtoSDR(false);
-                UpdateCropping(false);
+                UpdateRotationUnSafe(_RotationAngle, false);
+                UpdateHDRtoSDRUnSafe(false);
+                UpdateCroppingUnSafe(false);
             }
+            else if (VideoStream == null)
+                return false;
 
             var oldVP       = videoProcessor;
             VideoProcessor  = GetVP();
 
             if (oldVP != videoProcessor)
             {
-                VideoDecoder.DisposeFrame(LastFrame);
+                VideoDecoder.DisposeFrame(LastFrame); LastFrame = null;
                 VideoDecoder.DisposeFrames();
             }
 
-            textDesc[0].BindFlags
-                            &= ~BindFlags.RenderTarget; // Only D3D11VP without ZeroCopy requires it
             curPSCase       = PSCase.None;
             prevPSUniqueId  = curPSUniqueId;
             curPSUniqueId   = "";
@@ -149,12 +155,6 @@ unsafe public partial class Renderer
                     vd1.CreateVideoProcessorOutputView(backBuffer, vpe, vpovd, out vpov);
                     vc.VideoProcessorSetStreamColorSpace(vp, 0, inputColorSpace);
                     vc.VideoProcessorSetOutputColorSpace(vp, outputColorSpace);
-
-                    if (child != null)
-                    {
-                        child.vpov?.Dispose();
-                        vd1.CreateVideoProcessorOutputView(child.backBuffer, vpe, vpovd, out child.vpov);
-                    }
                 }
                 else if (!Config.Video.SwsForce || VideoDecoder.VideoAccelerated) // FlyleafVP
                 {
@@ -208,7 +208,7 @@ unsafe public partial class Renderer
                         else
                             psBufferData.coefsIndex = 2;
 
-                        if (VideoDecoder.VideoStream.PixelComp0Depth > 8)
+                        if (VideoStream.PixelComp0Depth > 8)
                         {
                             srvDesc[0].Format = Format.R16_UNorm;
                             srvDesc[1].Format = Format.R16G16_UNorm;
@@ -226,12 +226,57 @@ unsafe public partial class Renderer
                         // HW || HWZeroCopy | TODO: Fix calculation of uniqueId (those are actually same sampling - without different defines)
                         curPSUniqueId += "3";
 
-                        SetPS(curPSUniqueId, @"
+                        switch (Config.Video._SplitFrameAlphaPosition)
+                        {
+                            case SplitFrameAlphaPosition.None:
+                                SetPS(curPSUniqueId, @"
     color = float4(
         Texture1.Sample(Sampler, input.Texture).r,
         Texture2.Sample(Sampler, input.Texture).rg,
         1.0f);
 ", defines);
+                                break;
+
+                            case SplitFrameAlphaPosition.Left:
+                                curPSUniqueId += "l";
+                                SetPS(curPSUniqueId, @"
+    color = float4(
+        Texture1.Sample(Sampler, float2(0.5 + (input.Texture.x / 2), input.Texture.y)).r,
+        Texture2.Sample(Sampler, float2(0.5 + (input.Texture.x / 2), input.Texture.y)).rg,
+        Texture1.Sample(Sampler, float2(input.Texture.x / 2, input.Texture.y)).r);
+", defines);
+                                break;
+
+                                case SplitFrameAlphaPosition.Right:
+                                curPSUniqueId += "r";
+                                SetPS(curPSUniqueId, @"
+    color = float4(
+        Texture1.Sample(Sampler, float2(input.Texture.x / 2, input.Texture.y)).r,
+        Texture2.Sample(Sampler, float2(input.Texture.x / 2, input.Texture.y)).rg,
+        Texture1.Sample(Sampler, float2(0.5 + (input.Texture.x / 2), input.Texture.y)).r);
+", defines);
+                                break;
+
+                                case SplitFrameAlphaPosition.Top:
+                                curPSUniqueId += "t";
+                                SetPS(curPSUniqueId, @"
+    color = float4(
+        Texture1.Sample(Sampler, float2(input.Texture.x, 0.5 + (input.Texture.y / 2))).r,
+        Texture2.Sample(Sampler, float2(input.Texture.x, 0.5 + (input.Texture.y / 2))).rg,
+        Texture1.Sample(Sampler, float2(input.Texture.x, input.Texture.y / 2)).r);
+", defines);
+                                break;
+
+                                case SplitFrameAlphaPosition.Bottom:
+                                curPSUniqueId += "b";
+                                SetPS(curPSUniqueId, @"
+    color = float4(
+        Texture1.Sample(Sampler, float2(input.Texture.x, input.Texture.y / 2)).r,
+        Texture2.Sample(Sampler, float2(input.Texture.x, input.Texture.y / 2)).rg,
+        Texture1.Sample(Sampler, float2(input.Texture.x, 0.5 + (input.Texture.y / 2))).r);
+", defines);
+                                break;
+                        }
                     }
 
                     else if (VideoStream.ColorType == ColorType.YUV)
@@ -284,7 +329,6 @@ unsafe public partial class Renderer
 
         float4 c1 = Texture1.Sample(Sampler, float2(pos1, input.Texture.y));
         float4 c2 = Texture1.Sample(Sampler, float2(pos2, input.Texture.y));
-
     ";
                             if (VideoStream.PixelFormat == AVPixelFormat.AV_PIX_FMT_YUYV422 ||
                                 VideoStream.PixelFormat == AVPixelFormat.AV_PIX_FMT_Y210LE)
@@ -386,10 +430,7 @@ unsafe public partial class Renderer
     color.a = Texture4.Sample(Sampler, input.Texture).r;
 ";
                             }
-                            else
-                                shader += @"
-    color.a = 1.0f;
-";
+
                             Format  curFormat = Format.R8_UNorm;
                             int     maxBits   = 8;
                             if (VideoStream.PixelComp0Depth > 8)
@@ -402,15 +443,19 @@ unsafe public partial class Renderer
                             for (int i = 0; i < VideoStream.PixelPlanes; i++)
                                 textDesc[i].Format = srvDesc[i].Format = curFormat;
 
-                            // TBR: This is an estimation from N-bits to eg 16-bits
+                            // TBR: This is an estimation from N-bits to eg 16-bits (should include alpha!?)
                             if (maxBits - VideoStream.PixelComp0Depth != 0)
                             {
                                 curPSUniqueId += VideoStream.PixelComp0Depth;
                                 shader += @"
-    color.rgb *= pow(2, " + (maxBits - VideoStream.PixelComp0Depth) + @");
+    color *= pow(2, " + (maxBits - VideoStream.PixelComp0Depth) + @");
 ";
                             }
 
+                            if (VideoStream.PixelPlanes < 4)
+                                shader += @"
+    color.a = 1.0f;
+";
                             SetPS(curPSUniqueId, shader, defines);
                         }
                     }
@@ -450,10 +495,16 @@ unsafe public partial class Renderer
                             for (int i = 0; i < VideoStream.PixelComps.Length; i++)
                                 offsets += pixelOffsets[(int) (VideoStream.PixelComps[i].offset / Math.Ceiling(VideoStream.PixelComp0Depth / 8.0))];
 
+                            // TBR: [RGB0]32 has no alpha remove it
+                            if (VideoStream.PixelFormatStr[0] == '0')
+                                offsets = offsets[1..];
+                            else if (VideoStream.PixelFormatStr[^1] == '0')
+                                offsets = offsets[..^1];
+
                             curPSUniqueId += offsets;
 
                             string shader;
-                            if (VideoStream.PixelComps.Length > 3)
+                            if (VideoStream.PixelComps.Length > 3 && offsets.Length > 3)
                                 shader = @$"
     color = Texture1.Sample(Sampler, input.Texture).{offsets};
 ";
@@ -534,10 +585,7 @@ unsafe public partial class Renderer
     color.a = Texture4.Sample(Sampler, input.Texture).r;
 ";
                             }
-                            else
-                                shader += @"
-    color.a = 1.0f;
-";
+
                             /* TODO:
                              * Using pow for scale/normalize is not accurate (when maxBits != VideoStream.PixelComp0Depth)
                              * Mainly affects gbrp10 (should prefer Texture2D<float> for more accurate and better performance)
@@ -565,7 +613,7 @@ unsafe public partial class Renderer
                             {
                                 curPSUniqueId += VideoStream.PixelComp0Depth;
                                 shader += @"
-    color.rgb *= pow(2, " + (maxBits - VideoStream.PixelComp0Depth) + @");
+    color *= pow(2, " + (maxBits - VideoStream.PixelComp0Depth) + @");
 ";
                             }
 
@@ -578,6 +626,10 @@ unsafe public partial class Renderer
 ";
                             }
 
+                            if (VideoStream.PixelPlanes < 4)
+                                shader += @"
+    color.a = 1.0f;
+";
                             SetPS(curPSUniqueId, shader, defines);
                         }
                     }
@@ -654,10 +706,6 @@ unsafe public partial class Renderer
 ");
             }
 
-            //AV_PIX_FMT_FLAG_ALPHA (currently used only for RGBA?)
-            //context.OMSetBlendState(curPSCase == PSCase.RGBPacked || (curPSCase == PSCase.RGBPlanar && VideoStream.PixelPlanes == 4) ? blendStateAlpha : null);
-            context.OMSetBlendState((VideoStream.PixelFormatDesc->flags & AV_PIX_FMT_FLAG_ALPHA) != 0 ? blendStateAlpha : null);
-
             Log.Debug($"Prepared planes for {VideoStream.PixelFormatStr} with {videoProcessor} [{curPSCase}]");
 
             return true;
@@ -680,15 +728,6 @@ unsafe public partial class Renderer
                     SetViewport();
                 else if (!forceNotExtractor)
                     PrepareForExtract();
-
-                if (child != null)
-                {
-                    //replica.ConfigPlanes();
-                    child.curRatio      = curRatio;
-                    child.VideoRect     = VideoRect;
-                    child.videoProcessor= videoProcessor;
-                    child.SetViewport();
-                }
             }
             Monitor.Exit(lockDevice);
             Monitor.Exit(VideoDecoder.lockCodecCtx);
@@ -696,7 +735,7 @@ unsafe public partial class Renderer
     }
 
     internal VideoFrame FillPlanes(AVFrame* frame)
-    {
+    {   // TBR: lockDevice?
         try
         {
             VideoFrame mFrame = new();
@@ -742,19 +781,18 @@ unsafe public partial class Renderer
                 mFrame.textures = new ID3D11Texture2D[VideoStream.PixelPlanes];
                 mFrame.srvs     = new ID3D11ShaderResourceView[VideoStream.PixelPlanes];
 
-                bool newRotationLinesize = false;
+                bool vflip = false;
                 for (uint i = 0; i < VideoStream.PixelPlanes; i++)
                 {
-                    if (frame->linesize[i] < 0) // Negative linesize for vertical flipping
+                    if (frame->linesize[i] < 0) // Negative linesize needs vertical flipping | [Bottom -> Top] data[i] points to last row and we need to move at first (height - 1) rows
                     {
-                        newRotationLinesize     = true;
-                        subData[0].RowPitch     = (int)(-1 * frame->linesize[i]);
-                        subData[0].DataPointer  = (nint)frame->data[i];
-                        subData[0].DataPointer -= (nint)((subData[0].RowPitch * (VideoStream.Height - 1))); // TBR: Heigh is wrong here (needs texture's height?)
+                        vflip = true;
+                        subData[0].RowPitch     = -1 * frame->linesize[i];
+                        subData[0].DataPointer  = (nint)frame->data[i] + (frame->linesize[i] * (frame->height - 1));
                     }
                     else
                     {
-                        newRotationLinesize     = false;
+                        vflip = false;
                         subData[0].RowPitch     = frame->linesize[i];
                         subData[0].DataPointer  = (nint)frame->data[i];
                     }
@@ -769,9 +807,9 @@ unsafe public partial class Renderer
                     mFrame.srvs[i]      = Device.CreateShaderResourceView(mFrame.textures[i], srvDesc[i]);
                 }
 
-                if (newRotationLinesize != rotationLinesize)
+                if (vflip != hasLinesizeVFlip)
                 {
-                    rotationLinesize = newRotationLinesize;
+                    hasLinesizeVFlip = vflip;
                     UpdateRotation(_RotationAngle);
                 }
             }
@@ -784,21 +822,21 @@ unsafe public partial class Renderer
         {
             av_frame_unref(frame);
 
-            if (e.ResultCode == Vortice.DXGI.ResultCode.DeviceRemoved || e.ResultCode == Vortice.DXGI.ResultCode.DeviceReset)
+            if (IsDeviceError(e.ResultCode))
             {
-                Log.Error($"Device Lost ({e.ResultCode} | {Device.DeviceRemovedReason} | {e.Message})");
+                Log.Error($"[FillPlanes] Device Lost ({e.ResultCode.NativeApiCode} | {Device.DeviceRemovedReason} | {e.Message})");
                 Thread.Sleep(100);
                 VideoDecoder.handleDeviceReset = true; // We can't stop from RunInternal
             }
             else
-                Log.Error($"Failed to process frame ({e.Message})");
+                Log.Error($"[FillPlanes] Failed ({e.Message})");
 
             return null;
         }
         catch (Exception e)
         {
             av_frame_unref(frame);
-            Log.Error($"Failed to process frame ({e.Message})");
+            Log.Error($"[FillPlanes] Failed ({e.Message})");
 
             return null;
         }
