@@ -278,7 +278,7 @@ unsafe partial class Player
     }
 
     private void ScreamerZeroLatency()
-    {   // Video Only | IsLive | No Deinterlacing | No Frame Stepping | No Bitrate Stats | No Buffered Duration | Frame rate = receiving packets rate
+    {   // Video + Data Only | IsLive | No Deinterlacing | No Frame Stepping | No Bitrate Stats | No Buffered Duration | Frame rate = receiving packets rate
         VideoDemuxer.Pause();
         VideoDecoder.Pause();
         VideoDemuxer.DisposePackets();
@@ -287,14 +287,49 @@ unsafe partial class Player
         renderer.RenderPlayStart();
         while (status == Status.Playing)
         {
-            vFrame = VideoDecoder.GetFrameNext();
-            if (vFrame == null)
-                break;
+            int ret = VideoDemuxer.GetNextPacket();
+            if (ret < 0)
+            {
+                if (ret == AVERROR_EAGAIN)
+                {
+                    continue;
+                }
+                else
+                {
+                    break;
+                }
+            }
 
-            if (renderer.RenderPlay(vFrame, false))
-                renderer.PresentPlay();
+            AVPacket* packet = VideoDemuxer.packet;
+            if (packet->stream_index == VideoDemuxer.VideoStream.StreamIndex)
+            {
+                vFrame = VideoDecoder.TryGetFrame(packet);
+                if (vFrame == null)
+                    continue;
 
-            UpdateCurTime(vFrame.timestamp, false);
+                if (renderer.RenderPlay(vFrame, false))
+                    renderer.PresentPlay();
+
+                UpdateCurTime(vFrame.timestamp, false);
+            }
+            else if (VideoDemuxer.DataStream is not null && packet->stream_index == VideoDemuxer.DataStream.StreamIndex)
+            {
+                IntPtr ptr = new(packet->data);
+                byte[] dataFrame = new byte[packet->size];
+                System.Runtime.InteropServices.Marshal.Copy(ptr, dataFrame, 0, packet->size);
+
+                DataFrame dFrame = new()
+                {
+                    DataCodecId = VideoDemuxer.DataStream.CodecID,
+                    Data        = dataFrame
+                };
+                OnDataFrame?.Invoke(this, dFrame);
+                av_packet_unref(packet);
+            }
+            else
+            {
+                av_packet_unref(packet);
+            }
         }
 
         vFrame = null;

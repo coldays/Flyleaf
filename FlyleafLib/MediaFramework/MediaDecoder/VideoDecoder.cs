@@ -1246,13 +1246,15 @@ public unsafe class VideoDecoder : DecoderBase
     /// <remarks>Derived from GetFrameNext</remarks>
     public VideoFrame TryGetFrame(AVPacket* packet)
     {
+        checkExtraFrames = true;
+
         if (DecodeFrame(packet) == 0)
         {
             var mFrame = Renderer.FillPlanes(frame);
             if (mFrame != null)
                 return mFrame;
-            else if (handleDeviceReset)
-                HandleDeviceReset();
+            
+            HandleDeviceReset();
         }
 
         return null;
@@ -1355,17 +1357,35 @@ public unsafe class VideoDecoder : DecoderBase
         int ret;
         int allowedErrors = Config.Decoder.MaxErrors;
 
+        if (checkExtraFrames)
+        {
+            if (Status == Status.Ended)
+                return AVERROR_EOF;
+
+            if (DecodeFrameNextInternal() == 0)
+                return 0;
+
+            if (demuxer.Status == Status.Ended && vPackets.IsEmpty && Frames.IsEmpty)
+            {
+                Stop(); // NOTE: Could be paused and will cause dead lock with Status ended
+                Status = Status.Ended;
+                return AVERROR_EOF;
+            }
+
+            checkExtraFrames = false;
+        }
+
         if (keyPacketRequired)
         {
-            if ((packet->flags & AV_PKT_FLAG_KEY) != 0 || packet->pts == startPts)
-                keyPacketRequired = false;
-            else
+            if (!packet->flags.HasFlag(PktFlags.Key) && packet->pts != startPts)
             {
-                if (CanWarn)
-                    Log.Warn("Ignoring non-key packet");
+                if (CanDebug) Log.Debug("Ignoring non-key packet");
                 av_packet_unref(packet);
                 return AVERROR(EAGAIN);
             }
+
+            keyFrameRequired  = checkKeyFrame && packet->pts != startPts;
+            keyPacketRequired = false;
         }
 
         ret = avcodec_send_packet(codecCtx, packet);
@@ -1380,20 +1400,20 @@ public unsafe class VideoDecoder : DecoderBase
 
         if (ret != 0 && ret != AVERROR(EAGAIN))
         {
-            if (CanWarn)
-                Log.Warn($"{FFmpegEngine.ErrorCodeToMsg(ret)} ({ret})");
+            if (CanWarn) Log.Warn($"{FFmpegEngine.ErrorCodeToMsg(ret)} ({ret})");
 
             if (allowedErrors-- < 1)
-            { Log.Error("Too many errors!"); return ret; }
+                { Log.Error("Too many errors!"); return ret; }
 
-            return -1;
+            return ret;
         }
 
         if (DecodeFrameNextInternal() == 0)
         {
+            checkExtraFrames = true;
             return 0;
         }
-        return -1;
+        return AVERROR(EAGAIN);
     }
     private int DecodeFrameNextInternal()
     {
