@@ -18,7 +18,6 @@ public class FFmpegEngine
             Engine.Log.Info($"Loading FFmpeg libraries from '{Engine.Config.FFmpegPath}'");
             Folder = Utils.GetFolderPath(Engine.Config.FFmpegPath);
             RootPath = Folder;
-            DynamicallyLoadedBindings.FunctionResolver = new LavFFmpegWindowsLibraryLoader();
             DynamicallyLoadedBindings.Initialize();
 
             uint ver        = avformat_version();
@@ -82,22 +81,4 @@ public enum FFmpegLogLevel
     Debug = 0x30,
     Trace = 0x38,
     MaxOffset = 0x40,
-}
-
-
-internal class LavFFmpegWindowsLibraryLoader : FunctionResolverBase
-{
-    private const string Kernel32 = "kernel32";
-
-    protected override string GetNativeLibraryName(string libraryName, int version) => $"{libraryName}-lav-{version}.dll";
-
-    protected override IntPtr LoadNativeLibrary(string libraryName) => LoadLibrary(libraryName);
-    protected override IntPtr FindFunctionPointer(IntPtr nativeLibraryHandle, string functionName) => GetProcAddress(nativeLibraryHandle, functionName);
-
-
-    [DllImport(Kernel32, CharSet = CharSet.Ansi, BestFitMapping = false)]
-    public static extern IntPtr GetProcAddress(IntPtr hModule, string lpProcName);
-
-    [DllImport(Kernel32, SetLastError = true)]
-    public static extern IntPtr LoadLibrary(string dllToLoad);
 }
