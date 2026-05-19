@@ -319,11 +319,17 @@ public unsafe partial class Renderer
 
             if (Device != null)
             {
+                // When there is no GPU (integrated or dedicated) dxgiDevice and Device references the same object,
+                // but with different native pointers. In that case we need to only dispose one of them, or else we double free them.
+                const uint msBasicRenderDriver = 0x8c;
+                if (gpuAdapter.Id != msBasicRenderDriver && gpuAdapter.Vendor != GPUVendor.Microsoft)
+                {
+                    dxgiDevice.Dispose();
+                }
                 context.ClearState();
                 context.Flush();
                 context.Dispose();
                 Device.Dispose();
-                dxgiDevice.Dispose();
                 Device = null;
             }
 
@@ -336,7 +342,7 @@ public unsafe partial class Renderer
             if (CanInfo) Log.Info("Disposed");
         }
     }
-    
+
     public void Flush()
     {
         lock (lockDevice)

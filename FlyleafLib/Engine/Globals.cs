@@ -153,6 +153,7 @@ public enum GPUVendor : uint
 {
     Unknown,
     ATI         = 0x1002,
+    Microsoft   = 0x1414,
     Intel       = 0x8086,
     Nvidia      = 0x10DE,
     Qualcomm    = 0x4D4F4351,
