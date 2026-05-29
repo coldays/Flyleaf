@@ -308,11 +308,10 @@ unsafe partial class Player
                 {
                     Renderer.PresentPlay();
                     prevFrame?.Dispose();
+                    UpdateCurTime(vFrame.Timestamp, false);
                 }
                 else
                     vFrame.Dispose();
-
-                UpdateCurTime(vFrame.Timestamp, false);
             }
             else if (VideoDemuxer.DataStream is not null && packet->stream_index == VideoDemuxer.DataStream.StreamIndex)
             {
