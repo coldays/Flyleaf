@@ -275,8 +275,6 @@ public unsafe class VideoDecoder : DecoderBase
 
         VideoAccelerated = VideoAccelerated && CurCodecSpec.IsHW;
 
-        VideoAccelerated = VideoAccelerated && CurCodecSpec.IsHW;
-
         if (VideoAccelerated)
         {
             /* TODO: Frame threading [codecCtx->thread_type = ThreadTypeFlags.Frame]
@@ -315,38 +313,21 @@ public unsafe class VideoDecoder : DecoderBase
         if (codecCtx->codec_descriptor != null)
             isIntraOnly = codecCtx->codec_descriptor->props.HasFlag(AV_CODEC_PROP_INTRA_ONLY);
 
-        vPackets            = demuxer.VideoPackets;
-        keyFrameRequired    = keyPacketRequired = false; // allow no key packet after open (lot of videos missing this)
-        filledFromCodec     = false;
-        isDraining          = false;
-        lastFixedPts        = 0; // TBR: might need to set this to first known pts/dts
-        startPts            = VideoStream.StartTimePts;
-        allowedErrors       = Config.Decoder.MaxErrors;
+        vPackets = demuxer.VideoPackets;
+        keyFrameRequired = keyPacketRequired = false; // allow no key packet after open (lot of videos missing this)
+        filledFromCodec = false;
+        isDraining = false;
+        lastFixedPts = 0; // TBR: might need to set this to first known pts/dts
+        startPts = VideoStream.StartTimePts;
+        allowedErrors = Config.Decoder.MaxErrors;
 
         // Not all codecs fill key frame flag | https://github.com/SuRGeoNix/Flyleaf/issues/638 | Old MOV/MP4 container marking packets loosely as key
-        checkKeyFrame       = codecCtx->codec_id != AVCodecID.AV_CODEC_ID_AV1 &&
+        checkKeyFrame = codecCtx->codec_id != AVCodecID.AV_CODEC_ID_AV1 &&
                              (VideoAccelerated ||
                               codecCtx->codec_id != AVCodecID.AV_CODEC_ID_VP8 && codecCtx->codec_id != AVCodecID.AV_CODEC_ID_VP9 && codecCtx->codec_id != AVCodecID.AV_CODEC_ID_QTRLE);
 
-        if (CanDebug) Log.Debug($"Using {CurCodecSpec.Name} {(VideoAccelerated ? "(HW)" : "(SW)")}");
-
-        if (codecCtx->codec_descriptor != null)
-            isIntraOnly = (codecCtx->codec_descriptor->props & AV_CODEC_PROP_INTRA_ONLY) != 0;
-
-        vPackets            = demuxer.VideoPackets;
-        keyFrameRequired    = keyPacketRequired = false; // allow no key packet after open (lot of videos missing this)
-        filledFromCodec     = false;
-        isDraining          = false;
-        lastFixedPts        = 0; // TBR: might need to set this to first known pts/dts
-        startPts            = VideoStream.StartTimePts;
-        allowedErrors       = Config.Decoder.MaxErrors;
-
-        // Not all codecs fill key frame flag | https://github.com/SuRGeoNix/Flyleaf/issues/638 | Old MOV/MP4 container marking packets loosely as key
-        checkKeyFrame       = codecCtx->codec_id != AVCodecID.AV_CODEC_ID_AV1 &&
-                             (VideoAccelerated ||
-                              codecCtx->codec_id != AVCodecID.AV_CODEC_ID_VP8 && codecCtx->codec_id != AVCodecID.AV_CODEC_ID_VP9 && codecCtx->codec_id != AVCodecID.AV_CODEC_ID_QTRLE);
-
-        if (CanDebug) Log.Debug($"Using {CurCodecSpec.Name} {(VideoAccelerated ? "(HW)" : "(SW)")}");
+        if (CanDebug)
+            Log.Debug($"Using {CurCodecSpec.Name} {(VideoAccelerated ? "(HW)" : "(SW)")}");
 
         return true;
     }
