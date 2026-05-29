@@ -266,9 +266,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
                 if (e.Player.VideoDemuxer.Name.Contains("webm"))
                 {
-                    if (e.VideoStream.CodecID == FFmpeg.AutoGen.AVCodecID.AV_CODEC_ID_VP8)
+                    if (e.VideoStream.CodecID == Flyleaf.FFmpeg.AVCodecID.Vp8)
                         e.Player.Config.Decoder.VideoCodec = "libvpx";
-                    else if (e.VideoStream.CodecID == FFmpeg.AutoGen.AVCodecID.AV_CODEC_ID_VP9)
+                    else if (e.VideoStream.CodecID == Flyleaf.FFmpeg.AVCodecID.Vp9)
                         e.Player.Config.Decoder.VideoCodec = "libvpx-vp9";
                 }
             };

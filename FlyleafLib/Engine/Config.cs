@@ -6,6 +6,7 @@ using System.Text.Json.Serialization;
 #endif
 using System.Threading;
 using System.Threading.Tasks;
+using System.Xml.Serialization;
 using System.Windows.Data;
 
 using Vortice.Direct3D11;
@@ -18,7 +19,6 @@ using FlyleafLib.MediaPlayer;
 using FlyleafLib.Plugins;
 
 using Filter = FlyleafLib.MediaFramework.MediaDecoder.Filter;
-using System.Xml.Serialization;
 
 namespace FlyleafLib;
 
@@ -300,6 +300,11 @@ public class Config : NotifyPropertyChanged
         /// </summary>
         public bool     SeekAccurate                { get => _SeekAccurate; set => Set(ref _SeekAccurate, value); }
         bool _SeekAccurate;
+
+        /// <summary>
+        /// Allows off-screen (e.g. when minimized) snapshots but might affect performance
+        /// </summary>
+        public bool     SnapshotAlways              { get; set; }
 
         /// <summary>
         /// Snapshot encoding will be used (valid formats bmp, png, jpg/jpeg)
@@ -648,7 +653,7 @@ public class Config : NotifyPropertyChanged
             return video;
         }
 
-        internal Player player { get => _player; set { _player = value; vp = value != null ? value.Renderer : null; } }
+        internal Player player { get => _player; set { _player = value; vp = value?.Renderer; } }
         Player _player;
 
         /// <summary>

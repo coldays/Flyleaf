@@ -88,41 +88,15 @@ public unsafe partial class Renderer
         if (d3CacheEntry.Failed && !needsFillUnlock)
             return;
 
-        try
+        try { vd = device.QueryInterface<ID3D11VideoDevice>(); } catch { vd = null; }
+        if (vd == null)
         {
-            vd = device.QueryInterface<ID3D11VideoDevice>();
-            if (vd == null)
-            {
-                if (needsFillUnlock) Monitor.Exit(d3CacheEntry);
-                return;
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.Warn($"[{nameof(D3Setup)}] Exception while querying {nameof(ID3D11VideoDevice)}: {ex}");
-            if (needsFillUnlock)
-                Monitor.Exit(d3CacheEntry);
+            if (needsFillUnlock) Monitor.Exit(d3CacheEntry);
+
             return;
         }
-
-        try
-        {
-            vc = context.QueryInterface<ID3D11VideoContext>();
-        }
-        catch (Exception ex)
-        {
-            Log.Warn($"[{nameof(D3Setup)}] Exception while querying {nameof(ID3D11VideoContext)}: {ex}");
-            if (vp == null)
-            {
-                if (ve != null) { ve.Dispose(); ve = null; }
-                if (vc != null) { vc.Dispose(); vc = null; }
-
-                if (needsFillUnlock) Monitor.Exit(d3CacheEntry);
-
-                return;
-            }
-        }
-
+        
+        try { vc = context.QueryInterface<ID3D11VideoContext>(); } catch { vc = null; }
         if (vc != null)
             if (vd.CreateVideoProcessorEnumerator   (ref vped, out ve).Success)    // TBR: vpcd config (maybe requires max sizes)
                 vd.CreateVideoProcessor             (ve, 0, out vp);               // TBR: config for which rate index?
@@ -590,6 +564,9 @@ color = float4(Texture2.Sample(Sampler, input.Texture).r, Texture3.Sample(Sample
 
             vpRequests  = vpRequestsIn;
             vpRequestsIn= VPRequestType.Empty;
+
+            if (vpRequests.HasFlag(VPRequestType.BackColor))
+                SetBackColor();
 
             if (vpRequests.HasFlag(VPRequestType.RotationFlip))
                 D3SetRotationFlip();

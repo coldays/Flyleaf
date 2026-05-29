@@ -753,9 +753,9 @@ unsafe partial class Player
         isScreamerVASDAudio = true;
         Thread t = new(ScreamerVASDAudio) // try-catch
         {
-#if DEBUG
+            #if DEBUG
             Name            = $"[#{PlayerId}] [A] Playback",
-#endif
+            #endif
             IsBackground    = true
         };
         t.Start();

@@ -132,6 +132,7 @@ public unsafe partial class Renderer
         catch (SharpGenException e)
         {
             Log.Error($"[RenderIdle] Device Lost ({e.ResultCode.NativeApiCode} ({e.ResultCode}) | {device.DeviceRemovedReason} | {e.Message})");
+            isIdleRunning = false; // TBR: Possible to call RenderIdleStop which will freeze it #681
             ResetLocal();
 
             return false;
@@ -160,8 +161,21 @@ public unsafe partial class Renderer
             lastRenderAt = DateTime.UtcNow.Ticks;
 
             if (!SwapChain.CanPresent)
-                return true;
+            {
+                if (Config.Player.SnapshotAlways)
+                    lock (lockRenderLoops)
+                    {
+                        if (VideoProcessor == VideoProcessors.D3D11)
+                            D3ProcessRequests();
+                        else
+                            FLProcessRequests();
 
+                        Frames.SetRendererFrame(frame);
+                    }
+
+                return true;
+            }
+            
             lock (lockRenderLoops)
             {
                 if (VideoProcessor == VideoProcessors.D3D11)

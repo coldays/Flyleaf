@@ -387,6 +387,12 @@ public unsafe partial class Renderer : IVP
         vpRequests &= ~VPRequestType.AspectRatio;
         vpRequests |=  VPRequestType.Viewport;
     }
+    void SetBackColor()
+    {
+        vc?.VideoProcessorSetOutputBackgroundColor(vp, false, ucfg.d3BackColor);
+        vpRequests &= ~VPRequestType.BackColor;
+        vpRequests |=  VPRequestType.Viewport;
+    }
 
     void SetVisibleSizeAndRatioHelper()
     {

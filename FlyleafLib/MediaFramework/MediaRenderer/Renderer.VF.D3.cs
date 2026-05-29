@@ -1,4 +1,7 @@
 ﻿using System.Linq;
+#if NET5_0_OR_GREATER
+using System.Text.Json.Serialization;
+#endif
 
 using Vortice.Direct3D11;
 
@@ -106,7 +109,9 @@ public unsafe partial class Renderer
 public class D3Filter : NotifyPropertyChanged
 {   // NOTE: Serialization requires Public sets and constructor
 
-    //[JsonIgnore]
+#if NET5_0_OR_GREATER
+    [JsonIgnore]
+#endif
     public bool         Available   => renderer != null;
     public VideoProcessorFilter
                         Filter      { get; set; }
