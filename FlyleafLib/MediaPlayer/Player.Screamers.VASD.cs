@@ -511,7 +511,7 @@ unsafe partial class Player
 
                 if (dFrame != null)
                 {
-                    if (Math.Abs(dDistanceMs) < 30 || (dDistanceMs < -30))
+                    if (dDistanceMs != int.MinValue && (Math.Abs(dDistanceMs) < 30 || (dDistanceMs < -30)))
                     {
                         OnDataFrame?.Invoke(this, dFrame);
 
