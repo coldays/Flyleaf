@@ -139,7 +139,7 @@ public abstract unsafe class StreamBase : NotifyPropertyChanged
             dump += StartTimePts != NoTs ? $"{TicksToTime(StartTime)} ({StartTimePts})" : "-";
             dump += " / ";
             dump += AVStream->duration != NoTs ? $"{TicksToTime(Duration)} ({AVStream->duration})": "-";
-            dump += $" | tb: {AVStream->time_base}";
+            dump += $" | tb: {AVStream->time_base.num}/{AVStream->time_base.den}";
         }
 
         string profile = null;
