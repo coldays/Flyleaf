@@ -781,7 +781,7 @@ public unsafe class VideoDecoder : DecoderBase
 
         if (keyFrameRequired)
         {
-            if (!frame->flags.HasFlag(FrameFlags.Key))
+            if (!frame->flags.HasFlag(FrameFlags.Key) && frame->pict_type != AVPictureType.AV_PICTURE_TYPE_I)
             {
                 if (CanInfo) Log.Info("Ignoring non-key frame");
                 av_frame_unref(frame);
@@ -1422,7 +1422,7 @@ public unsafe class VideoDecoder : DecoderBase
 
         if (keyFrameRequired)
         {
-            if (!frame->flags.HasFlag(FrameFlags.Key)) { av_frame_unref(frame); DecodeFrameNextInternal(); }
+            if (!frame->flags.HasFlag(FrameFlags.Key) && frame->pict_type != AVPictureType.AV_PICTURE_TYPE_I) { av_frame_unref(frame); DecodeFrameNextInternal(); }
             keyFrameRequired = false;
         }
 
