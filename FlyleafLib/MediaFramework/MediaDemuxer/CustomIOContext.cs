@@ -50,11 +50,13 @@ public unsafe class CustomIOContext
         if (demuxer.Interrupter.ShouldInterrupt(null) != 0) return AVERROR_EXIT;
 
         byte[] managedBuffer = new byte[bufferSize];
-        Marshal.Copy((IntPtr)buffer, managedBuffer, 0, bufferSize);
         ret = demuxer.CustomIOContext.stream.Read(managedBuffer, 0, bufferSize);
 
         if (ret > 0)
+        {
+            Marshal.Copy(managedBuffer, 0, (IntPtr)buffer, Math.Min(ret, bufferSize));
             return ret;
+        }
 
         if (ret == 0)
             return AVERROR_EOF;
