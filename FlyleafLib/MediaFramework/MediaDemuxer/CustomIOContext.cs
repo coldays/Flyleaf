@@ -21,8 +21,15 @@ public unsafe class CustomIOContext
         //this.stream.Seek(0, SeekOrigin.Begin);
 
         ioread = IORead;
-        ioseek = IOSeek;
-        avioCtx = avio_alloc_context((byte*)av_malloc((nuint)demuxer.Config.IOStreamBufferSize), demuxer.Config.IOStreamBufferSize, 0, null, ioread, null, ioseek);
+        if (stream.CanSeek)
+        {
+            ioseek = IOSeek;
+            avioCtx = avio_alloc_context((byte*)av_malloc((nuint)demuxer.Config.IOStreamBufferSize), demuxer.Config.IOStreamBufferSize, 0, null, ioread, null, ioseek);
+        }
+        else
+        {
+            avioCtx = avio_alloc_context((byte*)av_malloc((nuint)demuxer.Config.IOStreamBufferSize), demuxer.Config.IOStreamBufferSize, 0, null, ioread, null, null);
+        }
         demuxer.FormatContext->pb     = avioCtx;
         demuxer.FormatContext->flags |= AVFMT_FLAG_CUSTOM_IO;
     }
