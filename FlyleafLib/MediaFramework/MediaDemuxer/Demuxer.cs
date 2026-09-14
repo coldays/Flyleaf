@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Web;
 using System.Windows.Data;
 using static FlyleafLib.Config;
 using static FlyleafLib.Logger;
@@ -420,7 +421,7 @@ public unsafe class Demuxer : RunThreadBase
                     }
                 }
 
-                url     = urlFromUrl;
+                url     = HttpUtility.UrlDecode(urlFromUrl);
                 fmtStr  = fmtStr.Replace("/", "");
                 inFmt   = av_find_input_format(fmtStr);
                 if (inFmt == null)
