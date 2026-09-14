@@ -25,6 +25,9 @@ public class FFmpegEngine
             Ver8OrGreater   = ver >> 16 > 61;
             SetLogLevel();
             AV_TIMEBASE_Q   = av_get_time_base_q();
+
+            avdevice_register_all();
+
             Engine.Log.Info($"FFmpeg Loaded (Location: {Folder}, FmtVer: {Version})");
         } catch (Exception e)
         {
