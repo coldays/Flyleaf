@@ -4,6 +4,7 @@ using System.IO.Compression;
 using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
+using System.Web;
 using System.Windows;
 
 using Microsoft.Win32;
@@ -596,7 +597,7 @@ public static partial class Utils
                 if (equalPos == -1)
                     dict[query[nameStart..i].ToString()] = null;
                 else
-                    dict[query[nameStart..equalPos].ToString()] = query.Slice(equalPos + 1, i - equalPos - 1).ToString();
+                    dict[query[nameStart..equalPos].ToString()] = HttpUtility.UrlDecode(query.Slice(equalPos + 1, i - equalPos - 1).ToString());
 
                 equalPos    = -1;
                 nameStart   = i + 1;
@@ -608,7 +609,7 @@ public static partial class Utils
             if (equalPos == -1)
                 dict[query[nameStart..].ToString()] = null;
             else
-                dict[query[nameStart..equalPos].ToString()] = query.Slice(equalPos + 1, query.Length - equalPos - 1).ToString();
+                dict[query[nameStart..equalPos].ToString()] = HttpUtility.UrlDecode(query.Slice(equalPos + 1, query.Length - equalPos - 1).ToString());
         }
 
         return dict;
