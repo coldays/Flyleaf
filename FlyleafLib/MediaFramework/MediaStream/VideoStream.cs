@@ -311,8 +311,16 @@ public unsafe class VideoStream : StreamBase
         if (rotData != null && rotData->data != null)
         {
             int_array9 displayMatrix = Marshal.PtrToStructure<int_array9>((nint)rotData->data);
-            var rotation = -Math.Round(av_display_rotation_get(displayMatrix));
-            Rotation = rotation - (360*Math.Floor(rotation/360 + 0.9/360));
+            double rotation = av_display_rotation_get(displayMatrix);
+            if (!double.IsNaN(rotation))
+            {
+                rotation = -Math.Round(av_display_rotation_get(displayMatrix));
+                Rotation = rotation - (360*Math.Floor(rotation/360 + 0.9/360));
+            }
+            else
+            {
+                Rotation = 0;
+            }
         }
 
         if (CanDebug)

@@ -383,13 +383,13 @@ unsafe public partial class Renderer
         actualVFlip     = newVflip;
         actualHFlip     = _HFlip;
 
-        if (actualRotation < 45 || actualRotation == 360)
+        if (actualRotation < 45 || actualRotation >= 315)
             _d3d11vpRotation = VideoProcessorRotation.Identity;
         else if (actualRotation < 135)
             _d3d11vpRotation = VideoProcessorRotation.Rotation90;
         else if (actualRotation < 225)
             _d3d11vpRotation = VideoProcessorRotation.Rotation180;
-        else if (actualRotation < 360)
+        else if (actualRotation < 315)
             _d3d11vpRotation = VideoProcessorRotation.Rotation270;
 
         vsBufferData.mat = Matrix4x4.CreateFromYawPitchRoll(0.0f, 0.0f, (float) (Math.PI / 180 * actualRotation));
